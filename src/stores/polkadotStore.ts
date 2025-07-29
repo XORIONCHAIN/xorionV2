@@ -6,7 +6,7 @@ import { TypeRegistry } from '@polkadot/types/create';
 import BN from 'bn.js';
 import { precompiledMetadata } from '../metadata';
 
-// Add balance formatting utilities
+// BALANCE FORMATTING UTILITY
 const formatTxor = (rawBalance: string, decimals = 18): string => {
   if (!rawBalance || rawBalance === '0') return '0';
   const bn = new BN(rawBalance);
@@ -39,7 +39,7 @@ export interface NetworkMetrics {
   lastUpdated: number;
 }
 
-// Enhanced Transaction interface with transfer detection
+// TRANSACTION INTERFACE WITH TRANSFER DETECTION
 export interface Transaction {
   hash: string;
   blockNumber: number;
@@ -52,7 +52,6 @@ export interface Transaction {
   success: boolean;
   fee: string;
   args: string[];
-  // Enhanced fields for transfer detection
   isTransfer: boolean;
   transferFrom?: string;
   transferTo?: string;
@@ -109,34 +108,34 @@ export interface ValidatorInfo {
 }
 
 interface PolkadotStore {
-  // API State
+  // API STATE
   apiState: ApiState;
   api: ApiPromise | null;
   
-  // Network Data
+  // NETWORK DATA
   networkMetrics: NetworkMetrics;
   chartData: any[];
   stakingData: any[];
   
-  // Transaction Data
+  // TRANSACTION DATA
   transactionData: TransactionData;
   isTransactionLoading: boolean;
   isTransactionFetching: boolean;
   
-  // Transaction Details
+  // TRANSACTION DETAILS
   transactionDetails: TransactionDetails | null;
   isDetailsLoading: boolean;
   detailsError: string | null;
   
-  // Loading States
+  // LOADING STATES
   isLoading: boolean;
   isFetching: boolean;
   
-  // Cache
+  // CACHE
   lastFetchTime: number;
   cacheTTL: number;
   
-  // Actions
+  // ACTIONS
   setApiState: (state: Partial<ApiState>) => void;
   setApi: (api: ApiPromise | null) => void;
   setNetworkMetrics: (metrics: Partial<NetworkMetrics>) => void;
@@ -152,35 +151,35 @@ interface PolkadotStore {
   setFetching: (fetching: boolean) => void;
   resetDetailsState: () => void;
   
-  // API Management
+  // API MANAGEMENT
   connect: (endpoint?: string) => Promise<void>;
   disconnect: () => void;
   reconnect: () => Promise<void>;
   
-  // Data Fetching
+  // DATA FETCHING
   fetchNetworkData: () => Promise<void>;
   fetchTransactionData: () => Promise<void>;
   fetchTransactionDetails: (hash: string) => Promise<void>;
   refreshData: () => Promise<void>;
   refreshTransactionData: () => Promise<void>;
   
-  // Caching
+  // CACHING
   cache: Map<string, { data: any; timestamp: number; ttl: number }>;
   getCached: (key: string) => any | null;
   setCached: (key: string, data: any, ttl?: number) => void;
   clearCache: () => void;
   
-  // Network Data (cached)
+  // NETWORK DATA (CACHED)
   networkData: any | null;
   setNetworkData: (data: any) => void;
   clearNetworkData: () => void;
 
-  // Validators
+  // VALIDATORS
   validators: ValidatorInfo[];
   fetchValidators: () => Promise<void>;
 }
 
-// Fixed endpoints with fallbacks
+// WEBSOCKET ENDPOINTS
 const ENDPOINTS = [
   import.meta.env.VITE_XORION_WS || "ws://3.219.48.230:9944"
 ];
@@ -197,8 +196,9 @@ const DEFAULT_METRICS: NetworkMetrics = {
   lastUpdated: 0
 };
 
-const CACHE_TTL = 30000; // 30 seconds
-const CONNECTION_TIMEOUT = 30000; // 30 seconds
+// TIMEOUT CONSTANTS
+const CACHE_TTL = 30000;
+const CONNECTION_TIMEOUT = 30000;
 const MAX_RETRIES = 5;
 const INITIAL_RETRY_DELAY = 2000; // 2 seconds
 const MAX_RETRY_DELAY = 30000; // 30 seconds
@@ -655,18 +655,18 @@ function setupProviderListeners(provider: WsProvider, endpoint: string) {
   const { setApiState } = usePolkadotStore.getState();
   
   const onConnected = () => {
-    console.log(`🔗 WebSocket connected to ${endpoint}`);
+    console.log(`WebSocket connected to ${endpoint}`);
     setApiState({ status: 'connected', lastConnected: new Date() });
   };
   
   const onDisconnected = () => {
-    console.log(`🔌 WebSocket disconnected from ${endpoint}`);
+    console.log(` WebSocket disconnected from ${endpoint}`);
     setApiState({ status: 'disconnected' });
     scheduleReconnect();
   };
   
   const onError = (error: any) => {
-    console.error(`❌ WebSocket error on ${endpoint}:`, error);
+    console.error(` WebSocket error on ${endpoint}:`, error);
     setApiState({ status: 'error', lastError: error.message });
     scheduleReconnect();
   };
@@ -701,7 +701,7 @@ function setupHealthMonitoring() {
         setApiState({ status: 'connected' });
       }
     } catch (error: any) {
-      console.error('❌ Health check failed:', error);
+      console.error(' Health check failed:', error);
       setApiState({ status: 'error', lastError: error.message });
       scheduleReconnect();
     }
@@ -714,7 +714,7 @@ function scheduleReconnect() {
   const { connectionAttempts } = usePolkadotStore.getState().apiState;
   
   if (connectionAttempts >= MAX_RETRIES) {
-    console.error('❌ Max connection attempts reached');
+    console.error(' Max connection attempts reached');
     return;
   }
   
@@ -1015,7 +1015,7 @@ async function performTransactionSearch(api: ApiPromise, searchHash: string, nor
   const finalizedBlock = await api.rpc.chain.getBlock(finalizedHead);
   const latestBlockNumber = finalizedBlock.block.header.number.toNumber();
   
-  console.log(`📦 Searching through blocks ${latestBlockNumber - 100} to ${latestBlockNumber}`);
+  console.log(` Searching through blocks ${latestBlockNumber - 100} to ${latestBlockNumber}`);
   
   // Search through last 100 blocks
   for (let i = 0; i < 100; i++) {
@@ -1042,7 +1042,7 @@ async function performTransactionSearch(api: ApiPromise, searchHash: string, nor
       });
       
       if (extrinsicIndex !== -1) {
-        console.log(`✅ Found transaction in block ${blockNumber} at index ${extrinsicIndex}`);
+        console.log(`Found transaction in block ${blockNumber} at index ${extrinsicIndex}`);
         
         const extrinsic = block.block.extrinsics[extrinsicIndex];
         
@@ -1102,7 +1102,7 @@ async function performTransactionSearch(api: ApiPromise, searchHash: string, nor
           decodedArgs: extrinsic.method.args.map(arg => arg.toHuman())
         };
         
-        console.log(`📋 Transaction details: ${transactionDetails.method}.${transactionDetails.section} in block ${blockNumber}`);
+        console.log(` Transaction details: ${transactionDetails.method}.${transactionDetails.section} in block ${blockNumber}`);
         return transactionDetails;
       }
     } catch (error) {
@@ -1111,7 +1111,7 @@ async function performTransactionSearch(api: ApiPromise, searchHash: string, nor
     }
   }
   
-  console.log(`❌ Transaction ${searchHash} not found in last 100 blocks`);
+  console.log(` Transaction ${searchHash} not found in last 100 blocks`);
   return null;
 }
 

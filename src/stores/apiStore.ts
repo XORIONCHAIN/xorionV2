@@ -17,33 +17,34 @@ export interface ApiState {
 }
 
 interface ApiStore {
-  // API State
+  // API STATE
   apiState: ApiState;
   api: ApiPromise | null;
   
-  // Actions
+  // ACTIONS
   setApiState: (state: Partial<ApiState>) => void;
   setApi: (api: ApiPromise | null) => void;
   
-  // API Management
+  // API MANAGEMENT
   connect: (endpoint?: string) => Promise<void>;
   disconnect: () => void;
   reconnect: () => Promise<void>;
   verifyChainConnection: () => Promise<any | undefined>;
 }
 
-// Constants
+// WEBSOCKET ENDPOINTS
 const ENDPOINTS = [
   "ws://3.219.48.230:9944"
 ];
 
+// CONNECTION CONSTANTS
 const MAX_RETRIES = 5;
 const MAX_RETRY_DELAY = 30000;
 const HEALTH_CHECK_INTERVAL = 30000;
 const MAX_LATENCY = 5000;
 const CACHE_TTL = 30000;
 
-// Global variables for connection management
+// GLOBAL CONNECTION VARIABLES
 let currentApi: ApiPromise | null = null;
 let currentProvider: WsProvider | null = null;
 let healthCheckInterval: NodeJS.Timeout | null = null;
@@ -53,7 +54,7 @@ let eventListeners: Record<string, () => void> = {};
 
 export const useApiStore = create<ApiStore>()(
   subscribeWithSelector((set, get) => ({
-    // Initial state
+    // INITIAL STATE
     apiState: {
       api: null,
       status: 'disconnected',
@@ -66,7 +67,7 @@ export const useApiStore = create<ApiStore>()(
     },
     api: null,
 
-    // Actions
+    // ACTIONS
     setApiState: (state: Partial<ApiState>) => {
       set((prev) => ({
         apiState: { ...prev.apiState, ...state }
@@ -78,7 +79,7 @@ export const useApiStore = create<ApiStore>()(
       currentApi = api;
     },
 
-    // API Management
+    // API MANAGEMENT
     connect: async (endpoint?: string) => {
       const { setApiState, setApi } = get();
       

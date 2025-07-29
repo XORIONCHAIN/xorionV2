@@ -23,7 +23,7 @@ export default function Footer() {
     <footer className="glass-card border-t border-border py-12 px-4 sm:px-6 lg:px-8">
       <div className="max-w-6xl mx-auto">
         <div className="flex flex-col gap-10">
-          {/* Top section */}
+          {/* TOP SECTION */}
           <div className="flex flex-col md:flex-row justify-between items-center gap-6">
             <motion.div
               className="flex items-center gap-2 cursor-pointer"
@@ -74,7 +74,7 @@ export default function Footer() {
             </div>
           </div>
 
-          {/* Bottom copyright */}
+          {/* BOTTOM COPYRIGHT */}
           <motion.p
             className="text-center text-muted-foreground text-sm pt-4 border-t border-border"
             initial={{ opacity: 0 }}

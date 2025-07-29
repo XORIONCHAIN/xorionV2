@@ -11,6 +11,7 @@ interface ConnectionState {
   endpoint: string | null;
 }
 
+// PERSISTENT POLKADOT API MANAGER
 class PersistentPolkadotApi {
   private static instance: PersistentPolkadotApi;
   private api: ApiPromise | null = null;
@@ -28,10 +29,10 @@ class PersistentPolkadotApi {
   private healthCheckInterval: NodeJS.Timeout | null = null;
   private endpoints: string[];
   private currentEndpointIndex = 0;
-  private connectionTimeout = 30000; // 30 seconds
+  private connectionTimeout = 30000;
   private maxRetries = 5;
   private retryDelay = 2000;
-  private maxLatency = 1000; // 1 second
+  private maxLatency = 1000;
 
   private constructor(endpoints: string[] = (
     import.meta.env.VITE_POLKADOT_ENDPOINTS
@@ -80,7 +81,7 @@ class PersistentPolkadotApi {
     });
 
     try {
-      // Clean up previous connection
+      // CLEAN UP PREVIOUS CONNECTION
       await this.disconnect();
 
       const endpoint = this.endpoints[this.currentEndpointIndex];
@@ -88,7 +89,7 @@ class PersistentPolkadotApi {
 
       this.provider = new WsProvider(endpoint, this.connectionTimeout);
       
-      // Setup provider event handlers
+      // SETUP PROVIDER EVENT HANDLERS
       this.provider.on('connected', () => this.handleConnected());
       this.provider.on('disconnected', () => this.handleDisconnected());
       this.provider.on('error', (error: Error) => this.handleError(error));
@@ -100,14 +101,14 @@ class PersistentPolkadotApi {
         initWasm: false
       });
 
-      // Setup API event handlers
+      // SETUP API EVENT HANDLERS
       this.api.on('connected', () => this.handleConnected());
       this.api.on('disconnected', () => this.handleDisconnected());
       this.api.on('error', (error: Error) => this.handleError(error));
 
       await this.api.isReady;
       
-      // Verify connection with a simple RPC call
+      // VERIFY CONNECTION WITH A SIMPLE RPC CALL
       await this.api.rpc.system.chain();
       
       this.updateState({

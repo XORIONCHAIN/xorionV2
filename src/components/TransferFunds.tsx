@@ -12,15 +12,17 @@ import { formatBalance } from '@polkadot/util';
 import { cn } from '@/lib/utils';
 import BN from 'bn.js';
 import { usePolkadotStore } from '@/stores/polkadotStore';
+
+// XORION CHAIN CONFIGURATION
 const XORION_CHAIN_CONFIG = {
-  name: 'XOR',            // Changed from 'Xorion Chain'
-  symbol: 'tXOR',         // Changed from 'XOR'
-  decimals: 18,           // Remains 18
-  endpoint: import.meta.env.VITE_XORION_WS || "ws://3.219.48.230:9944", // Use env variable
-  ss58Format: 42,         // Unchanged
-  existentialDeposit: new BN('0'), // No minimum required to keep account alive
-  unit: new BN('1000000000000000000'), // 1 tXOR == 1e18 ions (planck)
-  runtimeVersion: 100,    // Unchanged
+  name: 'XOR',
+  symbol: 'tXOR',
+  decimals: 18,
+  endpoint: import.meta.env.VITE_XORION_WS || "ws://3.219.48.230:9944",
+  ss58Format: 42,
+  existentialDeposit: new BN('0'),
+  unit: new BN('1000000000000000000'),
+  runtimeVersion: 100,
 };
 
 interface TransferHistoryItem {
@@ -36,7 +38,7 @@ interface TransferHistoryItem {
   blockNumber?: number;
 }
 
-// Helper to format tXOR balances
+// TOKEN FORMATTING HELPER
 const formatToken = (amount: string | BN | number, decimals = 18, unit = 'tXOR', decimalsToShow = 6) => {
   if (amount == null) return `0 ${unit}`;
   const divisor = Math.pow(10, decimals);
@@ -47,7 +49,7 @@ const formatToken = (amount: string | BN | number, decimals = 18, unit = 'tXOR',
 const TransferFunds = () => {
   const { toast } = useToast();
   
-  // Use your existing Polkadot store instead of creating new connections
+  // POLKADOT STORE CONNECTION
   const { 
     api, 
     apiState, 
@@ -55,31 +57,30 @@ const TransferFunds = () => {
     disconnect 
   } = usePolkadotStore();
   
-  // Local component state - only UI specific
+  // LOCAL COMPONENT STATE
   const [accounts, setAccounts] = useState<InjectedAccountWithMeta[]>([]);
   const [selectedAccount, setSelectedAccount] = useState<InjectedAccountWithMeta | null>(null);
   const [balance, setBalance] = useState<string>('0');
   const [transferableBalance, setTransferableBalance] = useState<string>('0');
   const [lockedBalance, setLockedBalance] = useState<string>('0');
   
-  // Transfer state
+  // TRANSFER STATE
   const [recipient, setRecipient] = useState('');
   const [amount, setAmount] = useState('');
   const [loading, setLoading] = useState(false);
   const [transferHistory, setTransferHistory] = useState<TransferHistoryItem[]>([]);
   const [transferType, setTransferType] = useState<'transferKeepAlive' | 'transferAllowDeath'>('transferKeepAlive');
 
-  // Memoized connection status
+  // CONNECTION STATUS
   const isConnected = useMemo(() => apiState.status === 'connected', [apiState.status]);
   const connectionStatus = useMemo(() => apiState.status, [apiState.status]);
 
-  // Load wallet accounts ONLY once when component mounts
+  // LOAD WALLET ACCOUNTS
   useEffect(() => {
     let mounted = true;
     
     const loadAccounts = async () => {
       try {
-        // Check if accounts are already loaded
         if (accounts.length > 0) return;
         
         const extensions = await web3Enable('xorion-transfer-app');
@@ -114,14 +115,14 @@ const TransferFunds = () => {
     };
   }, []); // Only run once
 
-  // Connect to chain ONLY if not already connected
+  // CONNECT TO CHAIN ONLY IF NOT ALREADY CONNECTED
   useEffect(() => {
     if (apiState.status === 'disconnected') {
       connect();
     }
   }, [apiState.status, connect]);
 
-  // Fetch account balance - optimized with useCallback
+  // FETCH ACCOUNT BALANCE - OPTIMIZED WITH useCallback
   const fetchAccountInfo = useCallback(async () => {
     if (!api || !selectedAccount || !isConnected) return;
 
@@ -154,19 +155,19 @@ const TransferFunds = () => {
     }
   }, [api, selectedAccount, isConnected]);
 
-  // Fetch balance with optimized interval
+  // FETCH BALANCE WITH OPTIMIZED INTERVAL
   useEffect(() => {
     if (!isConnected || !selectedAccount) return;
     
     fetchAccountInfo();
     
-    // Only set interval if we have a connected API and selected account
+    // ONLY SET INTERVAL IF WE HAVE A CONNECTED API AND SELECTED ACCOUNT
     const interval = setInterval(fetchAccountInfo, 15000); // Increased to 15s
     
     return () => clearInterval(interval);
   }, [fetchAccountInfo, isConnected, selectedAccount]);
 
-  // Validate address - memoized
+  // VALIDATE ADDRESS - MEMOIZED
   const validateAddress = useCallback((address: string): boolean => {
     try {
       if (!api) return false;
@@ -177,7 +178,7 @@ const TransferFunds = () => {
     }
   }, [api]);
 
-  // Convert tXOR amount to ions - memoized
+  // CONVERT tXOR AMOUNT TO IONS - MEMOIZED
   const tXORToIons = useCallback((amount: string): BN => {
     if (!amount || amount === '0' || amount === '') return new BN(0);
     
@@ -205,7 +206,7 @@ const TransferFunds = () => {
     }
   }, []);
 
-  // Convert ions back to tXOR - memoized
+  // CONVERT IONS BACK TO tXOR - MEMOIZED
   const ionsToTXOR = useCallback((ions: BN): string => {
     if (ions.isZero()) return '0';
     
@@ -226,7 +227,7 @@ const TransferFunds = () => {
     return `${wholePart.toString()}.${trimmedDecimal}`;
   }, []);
 
-  // Calculate maximum transferable amount - memoized
+  // CALCULATE MAXIMUM TRANSFERABLE AMOUNT - MEMOIZED
   const getMaxTransferableAmount = useCallback((): BN => {
     if (!selectedAccount || !balance) return new BN(0);
     
@@ -242,14 +243,14 @@ const TransferFunds = () => {
     }
   }, [selectedAccount, balance, lockedBalance, transferType]);
 
-  // Set maximum amount
+  // SET MAXIMUM AMOUNT
   const setMaxAmount = useCallback(() => {
     const maxBN = getMaxTransferableAmount();
     const maxInTXOR = ionsToTXOR(maxBN);
     setAmount(maxInTXOR);
   }, [getMaxTransferableAmount, ionsToTXOR]);
 
-  // Validate transfer amount - memoized
+  // VALIDATE TRANSFER AMOUNT - MEMOIZED
   const validateTransferAmount = useCallback((amountStr: string): { isValid: boolean; error?: string } => {
     if (!amountStr || amountStr === '') {
       return { isValid: true };
@@ -276,7 +277,7 @@ const TransferFunds = () => {
     }
   }, [tXORToIons, transferableBalance, ionsToTXOR]);
 
-  // Handle transfer - optimized
+  // HANDLE TRANSFER - OPTIMIZED
   const handleTransfer = useCallback(async () => {
     if (!api || !selectedAccount || !isConnected) {
       toast({ title: 'Not Connected', description: 'Please ensure wallet and chain are connected', variant: 'destructive' });
@@ -430,7 +431,7 @@ const TransferFunds = () => {
     }
   }, [api, selectedAccount, isConnected, recipient, amount, validateAddress, validateTransferAmount, transferType, tXORToIons, balance, lockedBalance, ionsToTXOR, toast]);
 
-  // Utility functions - memoized
+  // UTILITY FUNCTIONS - MEMOIZED
   const formatAddress = useCallback((address: string) => {
     return `${address.slice(0, 6)}...${address.slice(-4)}`;
   }, []);
@@ -446,13 +447,13 @@ const TransferFunds = () => {
     }
   }, []);
 
-  // Get amount validation state - memoized
+  // GET AMOUNT VALIDATION STATE - MEMOIZED
   const getAmountValidation = useCallback(() => {
     if (!amount || amount === '' || !selectedAccount) return null;
     return validateTransferAmount(amount);
   }, [amount, selectedAccount, validateTransferAmount]);
 
-  // Optimized loading state
+  // OPTIMIZED LOADING STATE
   if (connectionStatus === 'connecting' || connectionStatus === 'disconnected') {
     return (
       <div className="min-h-screen bg-card p-4 flex items-center justify-center">

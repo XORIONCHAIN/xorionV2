@@ -10,8 +10,8 @@ import Footer from '@/components/Footer';
 import AirdropPanel from '@/components/AirdropPanel';
 import { Label } from 'recharts';
 import { GiTwoCoins } from "react-icons/gi"
-//import NavigationBar from '@/components/NavigationBar';
 
+// LAZY LOADED COMPONENTS
 const StakingInterface = lazy(() => import('@/components/StakingInterface'));
 const ValidatorPanel = lazy(() => import('@/components/ValidatorPanel'));
 const TransactionExplorer = lazy(() => import('@/components/TransactionExplorer'));
@@ -22,7 +22,7 @@ const NavigationBar = ({ tabs, activeTab, setActiveTab }) => {
 
   return (
     <>
-      {/* Desktop Navigation - Visible on lg+ screens */}
+      {/* DESKTOP NAVIGATION - VISIBLE ON LG+ SCREENS */}
       <nav className="hidden lg:block bg-background border-b border-border">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex space-x-8">
@@ -47,11 +47,11 @@ const NavigationBar = ({ tabs, activeTab, setActiveTab }) => {
         </div>
       </nav>
 
-      {/* Mobile Navigation - Hamburger menu for lg- screens */}
+      {/* MOBILE NAVIGATION - HAMBURGER MENU FOR LG- SCREENS */}
       <nav className="lg:hidden bg-background border-b border-border">
         <div className="max-w-7xl mx-auto px-4 sm:px-6">
           <div className="flex items-center justify-between h-12">
-            {/* Current Tab Indicator */}
+            {/* CURRENT TAB INDICATOR */}
             <div className="flex items-center space-x-2">
               {(() => {
                 const currentTab = tabs.find(tab => tab.id === activeTab);
@@ -65,7 +65,7 @@ const NavigationBar = ({ tabs, activeTab, setActiveTab }) => {
               })()}
             </div>
 
-            {/* Mobile Menu Button */}
+            {/* MOBILE MENU BUTTON */}
             <Sheet open={mobileMenuOpen} onOpenChange={setMobileMenuOpen}>
               <SheetTrigger asChild>
                 <Button variant="ghost" size="sm" className="p-2">

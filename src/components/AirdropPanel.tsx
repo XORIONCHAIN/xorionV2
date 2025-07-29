@@ -5,6 +5,7 @@ import { FiDroplet, FiRefreshCw, FiInfo, FiZap, FiCopy, FiCheckCircle, FiAlertCi
 import { MdAccountBalanceWallet } from 'react-icons/md';
 import { useWallet } from './WalletConnection';
 
+// AIRDROP MANAGER CLASS
 class AirdropManager {
   api;
   account;
@@ -56,7 +57,7 @@ export default function AirdropPanel() {
   const [manager, setManager] = useState(null);
   const [stats, setStats] = useState(null);
   const [events, setEvents] = useState([]);
-  const [status, setStatus] = useState('connecting'); // or 'ready', 'error'
+  const [status, setStatus] = useState('connecting');
   const [loading, setLoading] = useState(false);
   const [claiming, setClaiming] = useState(false);
   const [msg, setMsg] = useState('');
@@ -64,7 +65,7 @@ export default function AirdropPanel() {
 
   const { selectedAccount } = useWallet();
 
-  // Only connect to API if user has selected an account
+  // CONNECT TO API IF USER HAS SELECTED ACCOUNT
   useEffect(() => {
     let unmounted = false;
     if (!selectedAccount) {
@@ -89,7 +90,7 @@ export default function AirdropPanel() {
     return () => { unmounted = true; };
   }, [selectedAccount]);
 
-  // Set up manager and update stats
+  // SET UP MANAGER AND UPDATE STATS
   useEffect(() => {
     if (api && selectedAccount) {
       const m = new AirdropManager(api, selectedAccount);
