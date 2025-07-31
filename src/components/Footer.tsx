@@ -13,7 +13,7 @@ const socialLinks = [
   { href: "https://x.com/xorionchain?s=21", label: "X", icon: FaTwitter },
   { href: "https://discord.gg/ucc278yJZt", label: "Discord", icon: FaDiscord },
   { href: "https://t.me/Xorion_Chain", label: "Telegram", icon: FaTelegramPlane },
-  { href: "https://github.com/settings/admin", label: "GitHub", icon: FaGithub },
+  { href: https://github.com/XORIONCHAIN", label: "GitHub", icon: FaGithub },
 ];
 
 export default function Footer() {
