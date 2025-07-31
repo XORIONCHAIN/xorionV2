@@ -30,7 +30,7 @@ const socialLinks = [
   },
   {
     label: "GitHub",
-    href: "https://github.com/settings/admin",
+    href: "https://github.com/XORIONCHAIN",
     icon: FaGithub,
     description: "Code"
   },
