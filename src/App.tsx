@@ -15,6 +15,7 @@ const LandingPage = lazy(() => import("./pages/LandingPage"));
 const Index = lazy(() => import("./pages/Index"));
 const NotFound = lazy(() => import("./pages/NotFound"));
 const ExplorerPage = lazy(() => import("./pages/ExplorerPage"));
+const TasksPage = lazy(() => import("./pages/TasksPage"))
 
 const Load = () => {
   return <div className="w-screen h-screen flex items-center justify-center">
@@ -30,10 +31,11 @@ const App = () => (
         <Sonner />
         <WalletProvider>
           <BrowserRouter>
-            <Suspense fallback={<Load/>}>
+            <Suspense fallback={<Load />}>
               <Routes>
                 <Route path="/" element={<LandingPage />} />
                 <Route path="/explorer" element={<Index />} />
+                <Route path="/tasks" element={<TasksPage />} />
                 <Route path="*" element={<NotFound />} />
               </Routes>
             </Suspense>
