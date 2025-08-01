@@ -38,7 +38,11 @@ export default function TasksPage() {
 
   const totalPoints = completed.reduce((sum, id) => sum + (tasks.find((t) => t.id === id)?.points || 0), 0)
 
-  const initiateTaskCompletion = (taskId: string, link: string) => {
+  const initiateTask = (link: string) => {
+    window.open(link, "_blank")
+  }
+
+  const initiateVerification = (taskId: string, link: string) => {
     if (!selectedAccount.address) {
       setError("Please connect your wallet first")
       return
@@ -54,9 +58,6 @@ export default function TasksPage() {
       setIsVerifying(true)
       setError(null)
       setIsModalOpen(false)
-      
-      // Open Twitter in a new tab
-      window.open(currentTask.link, "_blank")
       
       // Verify task completion with backend
       const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/tasks/verify`, {
@@ -165,7 +166,7 @@ export default function TasksPage() {
                       </div>
                     </div>
 
-                    <div className="flex-shrink-0">
+                    <div className="flex-shrink-0 flex gap-2">
                       {isDone ? (
                         <Button
                           disabled
@@ -175,20 +176,23 @@ export default function TasksPage() {
                           Completed
                         </Button>
                       ) : (
-                        <Button
-                          className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-500 hover:to-purple-500 text-white px-6 py-3 rounded-xl flex items-center gap-2 transition-all duration-300 shadow-lg hover:shadow-blue-500/25"
-                          onClick={() => initiateTaskCompletion(task.id, task.link)}
-                          disabled={isVerifying}
-                        >
-                          {isVerifying ? (
-                            "Verifying..."
-                          ) : (
-                            <>
-                              Complete
-                              <FaArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
-                            </>
-                          )}
-                        </Button>
+                        <>
+                          <Button
+                            className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-500 hover:to-purple-500 text-white px-4 py-2 rounded-xl flex items-center gap-2 transition-all duration-300 shadow-lg hover:shadow-blue-500/25"
+                            onClick={() => initiateTask(task.link)}
+                            disabled={isVerifying}
+                          >
+                            Do Task
+                            <FaArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+                          </Button>
+                          <Button
+                            className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 text-white px-4 py-2 rounded-xl flex items-center gap-2 transition-all duration-300 shadow-lg hover:shadow-purple-500/25"
+                            onClick={() => initiateVerification(task.id, task.link)}
+                            disabled={isVerifying}
+                          >
+                            {isVerifying ? "Verifying..." : "Verify"}
+                          </Button>
+                        </>
                       )}
                     </div>
                   </div>
