@@ -28,7 +28,7 @@ let cacheInitialized = false;
 // Initialize wallet cache immediately
 const initializeWalletCache = () => {
   if (cacheInitialized || typeof window === 'undefined') return;
-  
+
   POPULAR_WALLETS.forEach(wallet => {
     walletCache.set(wallet.name, !!(window as any).injectedWeb3?.[wallet.name]);
   });
@@ -88,6 +88,38 @@ export const WalletProvider = ({ children }: { children: ReactNode }) => {
   );
 };
 
+const STORAGE_KEY = 'walletConnection';
+const saveWalletConnection = (wallet: any, account: InjectedAccountWithMeta) => {
+  try {
+    const data = {
+      walletName: wallet.name,
+      accountAddress: account.address,
+      accountSource: account.meta.source,
+    };
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+  } catch (e) {
+    console.warn('Failed to save wallet connection:', e);
+  }
+};
+
+const loadWalletConnection = () => {
+  try {
+    const data = localStorage.getItem(STORAGE_KEY);
+    return data ? JSON.parse(data) : null;
+  } catch (e) {
+    console.warn('Failed to load wallet connection:', e);
+    return null;
+  }
+};
+
+const clearWalletConnection = () => {
+  try {
+    localStorage.removeItem(STORAGE_KEY);
+  } catch (e) {
+    console.warn('Failed to clear wallet connection:', e);
+  }
+};
+
 const WalletConnection = () => {
   const [modalOpen, setModalOpen] = useState(false);
   const [step, setStep] = useState<'wallets' | 'accounts' | 'summary'>('wallets');
@@ -97,27 +129,91 @@ const WalletConnection = () => {
   const { toast } = useToast();
   const { apiState, api } = usePolkadotStore();
   const { selectedWallet, setSelectedWallet, selectedAccount, setSelectedAccount, balance, setBalance, disconnectWallet } = useWallet();
-  
+
   // Refs for optimization
   const web3EnabledRef = useRef(false);
   const balanceAbortControllerRef = useRef<AbortController | null>(null);
+  const reconnectionAttemptedRef = useRef(false);
 
   // Pre-initialize wallet cache on component mount
   useEffect(() => {
     initializeWalletCache();
   }, []);
 
+  useEffect(() => {
+    if (reconnectionAttemptedRef.current || apiState.status !== 'connected') return;
+
+    const reconnectWallet = async () => {
+      reconnectionAttemptedRef.current = true;
+      const savedConnection = loadWalletConnection();
+      if (!savedConnection) return;
+
+      const { walletName, accountAddress, accountSource } = savedConnection;
+
+      // Check if the wallet is still installed
+      if (!checkWalletInstalled(walletName)) {
+        clearWalletConnection();
+        return;
+      }
+
+      try {
+        // Re-enable web3
+        await web3Enable('Xorion Blockchain Explorer');
+        web3EnabledRef.current = true;
+
+        // Find the wallet in POPULAR_WALLETS
+        const wallet = POPULAR_WALLETS.find(w => w.name === walletName);
+        if (!wallet) {
+          clearWalletConnection();
+          return;
+        }
+
+        // Set the selected wallet
+        setSelectedWallet({ ...wallet, installed: true });
+
+        // Fetch accounts
+        const accounts = await web3Accounts({ extensions: [walletName] });
+        const matchingAccount = accounts.find(
+          (acc: InjectedAccountWithMeta) =>
+            acc.address === accountAddress && acc.meta.source === accountSource
+        );
+
+        if (matchingAccount) {
+          setSelectedAccount(matchingAccount);
+          setStep('summary');
+        } else {
+          clearWalletConnection();
+          toast({
+            title: 'Reconnection Failed',
+            description: 'The previously connected account is not available.',
+            variant: 'destructive',
+          });
+        }
+      } catch (e) {
+        console.warn('Reconnection failed:', e);
+        clearWalletConnection();
+        toast({
+          title: 'Reconnection Failed',
+          description: 'Could not reconnect to the wallet. Please connect manually.',
+          variant: 'destructive',
+        });
+      }
+    };
+
+    reconnectWallet();
+  }, [apiState.status, setSelectedWallet, setSelectedAccount, toast]);
+
   // Optimized wallet checking - no delays, immediate response
   useEffect(() => {
     if (modalOpen && step === 'wallets') {
       // Immediately check installed wallets from cache
-      const installed = POPULAR_WALLETS.filter(wallet => 
+      const installed = POPULAR_WALLETS.filter(wallet =>
         checkWalletInstalled(wallet.name)
       ).map(wallet => ({
         ...wallet,
         installed: true
       }));
-      
+
       setInstalledWallets(installed);
 
       // Enable web3 in background if not already done
@@ -126,7 +222,7 @@ const WalletConnection = () => {
           web3EnabledRef.current = true;
           // Re-check after enabling (in case some wallets weren't detected initially)
           setTimeout(() => {
-            const recheckInstalled = POPULAR_WALLETS.filter(wallet => 
+            const recheckInstalled = POPULAR_WALLETS.filter(wallet =>
               checkWalletInstalled(wallet.name)
             ).map(wallet => ({
               ...wallet,
@@ -145,10 +241,10 @@ const WalletConnection = () => {
   useEffect(() => {
     if (step === 'accounts' && selectedWallet) {
       setLoading(true);
-      
+
       // Use Promise.race to timeout after 3 seconds
       const fetchPromise = web3Accounts({ extensions: [selectedWallet.name] });
-      const timeoutPromise = new Promise((_, reject) => 
+      const timeoutPromise = new Promise((_, reject) =>
         setTimeout(() => reject(new Error('Timeout')), 3000)
       );
 
@@ -175,7 +271,7 @@ const WalletConnection = () => {
       if (balanceAbortControllerRef.current) {
         balanceAbortControllerRef.current.abort();
       }
-      
+
       balanceAbortControllerRef.current = new AbortController();
       const signal = balanceAbortControllerRef.current.signal;
 
@@ -208,17 +304,19 @@ const WalletConnection = () => {
   const handleAccountSelect = useCallback((account: InjectedAccountWithMeta) => {
     setSelectedAccount(account);
     setStep('summary');
+    saveWalletConnection(selectedWallet, account);
     toast({
       title: 'Connected',
       description: `Connected to ${account.meta.name || 'Account'}`,
     });
-  }, [setSelectedAccount, toast]);
+  }, [setSelectedAccount, selectedWallet, toast]);
 
   const handleDisconnect = useCallback(() => {
     disconnectWallet();
     setAccounts([]);
     setStep('wallets');
     setModalOpen(false);
+    clearWalletConnection();
     toast({
       title: 'Disconnected',
       description: 'Wallet disconnected',
@@ -237,7 +335,7 @@ const WalletConnection = () => {
     });
   }, [toast]);
 
-  const formatShort = useCallback((address: string) => 
+  const formatShort = useCallback((address: string) =>
     `${address.slice(0, 6)}...${address.slice(-4)}`, []);
 
   const getNetworkName = useCallback(() => {
@@ -262,9 +360,9 @@ const WalletConnection = () => {
 
   const formattedBalance = useMemo(() => {
     if (!balance) return null;
-    return (Number(balance) / 1e18).toLocaleString(undefined, { 
-      minimumFractionDigits: 4, 
-      maximumFractionDigits: 8 
+    return (Number(balance) / 1e18).toLocaleString(undefined, {
+      minimumFractionDigits: 4,
+      maximumFractionDigits: 8
     });
   }, [balance]);
 
@@ -321,7 +419,7 @@ const WalletConnection = () => {
                   </Button>
                 ))}
               </div>
-              
+
               {notInstalled.length > 0 && (
                 <div>
                   <div className="text-xs font-semibold text-blue-600 mb-1">Popular</div>
