@@ -60,7 +60,7 @@ export default function TasksPage() {
       setIsModalOpen(false)
       
       // Verify task completion with backend
-      const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/tasks/verify`, {
+      const response = await fetch(`${import.meta.env.VITE_TASK_API_BASE_URL}/tasks/verify`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
