@@ -2,7 +2,7 @@ import { useState } from "react"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Progress } from "@/components/ui/progress"
-import { FaTwitter, FaCheck, FaArrowRight } from "react-icons/fa"
+import { FaTwitter, FaDiscord, FaTelegram, FaCheck, FaArrowRight } from "react-icons/fa"
 import { useWallet } from "@/components/WalletConnection"
 import Header from '@/components/Header';
 import Footer from "@/components/Footer"
@@ -24,6 +24,31 @@ const tasks = [
     icon: FaTwitter,
     link: "https://x.com/xorionchain?s=21",
     points: 10,
+    handleLabel: "Twitter Username",
+    handlePlaceholder: "e.g., yourusername",
+    handleNote: "Don't include the @ symbol"
+  },
+  {
+    id: "follow-discord",
+    label: "Join our Discord Server",
+    description: "Join our community and earn 100 points for joining our Discord server.",
+    icon: FaDiscord,
+    link: "https://discord.gg/xorionchain",
+    points: 100,
+    handleLabel: "Discord Username",
+    handlePlaceholder: "e.g., username#1234",
+    handleNote: "Include your full Discord username with discriminator"
+  },
+  {
+    id: "join-telegram",
+    label: "Join our Telegram Group",
+    description: "Join our Telegram community and earn 100 points.",
+    icon: FaTelegram,
+    link: "https://t.me/xorionchain",
+    points: 100,
+    handleLabel: "Telegram User ID",
+    handlePlaceholder: "e.g., 6817379249",
+    handleNote: "Enter your Telegram User ID (a numeric ID, not your username). Find it via @userinfobot"
   },
 ]
 
@@ -31,7 +56,7 @@ export default function TasksPage() {
   const [completed, setCompleted] = useState<string[]>([])
   const [isVerifying, setIsVerifying] = useState<boolean>(false)
   const [error, setError] = useState<string | null>(null)
-  const [currentTask, setCurrentTask] = useState<{id: string, link: string} | null>(null)
+  const [currentTask, setCurrentTask] = useState<{id: string, link: string, task: any} | null>(null)
   const [userHandle, setUserHandle] = useState<string>("")
   const [isModalOpen, setIsModalOpen] = useState<boolean>(false)
   const {selectedAccount} = useWallet()
@@ -47,8 +72,10 @@ export default function TasksPage() {
       setError("Please connect your wallet first")
       return
     }
-    setCurrentTask({ id: taskId, link })
+    const task = tasks.find(t => t.id === taskId)
+    setCurrentTask({ id: taskId, link, task })
     setIsModalOpen(true)
+    setError(null)
   }
 
   const handleComplete = async () => {
@@ -60,7 +87,7 @@ export default function TasksPage() {
       setIsModalOpen(false)
       
       // Verify task completion with backend
-      const response = await fetch(`${import.meta.env.VITE_TASK_API_BASE_URL}/tasks/verify`, {
+      const response = await fetch(`${import.meta.env.VITE_TASK_API_BASE_URL}/api/tasks/verify`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -73,7 +100,8 @@ export default function TasksPage() {
       })
 
       if (!response.ok) {
-        throw new Error("Verification failed")
+        const errorData = await response.json().catch(() => ({}))
+        throw new Error(errorData.error || errorData.message || `Server error: ${response.status}`)
       }
 
       const result = await response.json()
@@ -82,15 +110,28 @@ export default function TasksPage() {
       if (result.success) {
         setCompleted((prev) => [...prev, currentTask.id])
       } else {
-        throw new Error(result.error || "Task verification failed")
+        throw new Error(result.error || result.message || "Task verification failed")
       }
     } catch (err) {
       console.error("Task verification error:", err)
-      setError(err instanceof Error ? err.message : "An unknown error occurred")
+      if (err instanceof TypeError && err.message === "Failed to fetch") {
+        setError("Network error. Please check your connection and try again.")
+      } else {
+        setError(err instanceof Error ? err.message : "An unknown error occurred")
+      }
     } finally {
       setIsVerifying(false)
       setUserHandle("")
       setCurrentTask(null)
+    }
+  }
+
+  const handleModalClose = (open: boolean) => {
+    if (!open) {
+      setIsModalOpen(false)
+      setUserHandle("")
+      setCurrentTask(null)
+      setError(null)
     }
   }
 
@@ -150,8 +191,17 @@ export default function TasksPage() {
                 <CardContent className="p-6">
                   <div className="flex items-center justify-between gap-6">
                     <div className="flex items-center gap-4">
-                      <div className="p-3 rounded-xl bg-gradient-to-r from-blue-500/20 to-purple-500/20 border border-blue-500/30">
-                        <task.icon className="w-6 h-6 text-blue-400" />
+                      <div className={`p-3 rounded-xl ${
+                        task.id === 'follow-discord' 
+                          ? 'bg-gradient-to-r from-indigo-500/20 to-purple-500/20 border border-indigo-500/30' 
+                          : task.id === 'join-telegram'
+                          ? 'bg-gradient-to-r from-cyan-500/20 to-blue-500/20 border border-cyan-500/30'
+                          : 'bg-gradient-to-r from-blue-500/20 to-purple-500/20 border border-blue-500/30'
+                      }`}>
+                        <task.icon className={`w-6 h-6 ${
+                          task.id === 'follow-discord' ? 'text-indigo-400' : 
+                          task.id === 'join-telegram' ? 'text-cyan-400' : 'text-blue-400'
+                        }`} />
                       </div>
                       <div className="flex-1">
                         <h3 className="font-semibold text-white text-lg mb-1 group-hover:text-blue-300 transition-colors">
@@ -226,35 +276,44 @@ export default function TasksPage() {
       </div>
       <Footer />
 
-      {/* Twitter Handle Modal */}
-      <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
+      {/* Task Verification Modal */}
+      <Dialog open={isModalOpen} onOpenChange={handleModalClose}>
         <DialogContent className="bg-slate-900 border-slate-700">
           <DialogHeader>
-            <DialogTitle className="text-white">Verify Twitter Follow</DialogTitle>
+            <DialogTitle className="text-white">
+              {currentTask?.task?.id === 'follow-discord' ? 'Verify Discord Join' : 
+               currentTask?.task?.id === 'join-telegram' ? 'Verify Telegram Join' : 
+               'Verify Twitter Follow'}
+            </DialogTitle>
             <DialogDescription className="text-slate-400">
-              Please enter your Twitter (X) username to verify you've followed us.
+              {currentTask?.task?.id === 'follow-discord' 
+                ? "Please enter your Discord username to verify you've joined our server."
+                : currentTask?.task?.id === 'join-telegram'
+                ? "Please enter your Telegram User ID (not username) to verify you've joined our group. You can find your User ID using @userinfobot on Telegram."
+                : "Please enter your Twitter (X) username to verify you've followed us."
+              }
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="twitter-handle" className="text-slate-300">
-                Twitter Username
+              <Label htmlFor="user-handle" className="text-slate-300">
+                {currentTask?.task?.handleLabel || "Username"}
               </Label>
               <Input
-                id="twitter-handle"
-                placeholder="e.g., yourusername"
+                id="user-handle"
+                placeholder={currentTask?.task?.handlePlaceholder || "e.g., username"}
                 value={userHandle}
                 onChange={(e) => setUserHandle(e.target.value)}
                 className="bg-slate-800 border-slate-700 text-white"
               />
               <p className="text-sm text-slate-500">
-                Don't include the @ symbol
+                {currentTask?.task?.handleNote || "Enter your username"}
               </p>
             </div>
             <div className="flex justify-end gap-2">
               <Button
                 variant="outline"
-                onClick={() => setIsModalOpen(false)}
+                onClick={() => handleModalClose(false)}
                 className="border-slate-700 text-white hover:bg-slate-800"
               >
                 Cancel
