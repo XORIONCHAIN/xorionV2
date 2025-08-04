@@ -15,7 +15,8 @@ const LandingPage = lazy(() => import("./pages/LandingPage"));
 const Index = lazy(() => import("./pages/Index"));
 const NotFound = lazy(() => import("./pages/NotFound"));
 const ExplorerPage = lazy(() => import("./pages/ExplorerPage"));
-const TasksPage = lazy(() => import("./pages/TasksPage"))
+const TasksPage = lazy(() => import("./pages/TasksPage"));
+const LeaderboardPage = lazy(() => import("./pages/TasksLeaderboardPage"))
 
 const Load = () => {
   return <div className="w-screen h-screen flex items-center justify-center">
@@ -36,6 +37,7 @@ const App = () => (
                 <Route path="/" element={<LandingPage />} />
                 <Route path="/explorer" element={<Index />} />
                 <Route path="/tasks" element={<TasksPage />} />
+                <Route path="/tasks/leaderboard" element={<LeaderboardPage />} />
                 <Route path="*" element={<NotFound />} />
               </Routes>
             </Suspense>

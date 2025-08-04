@@ -15,6 +15,7 @@ import {
 } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { useQuery } from "@tanstack/react-query"
 
 const tasks = [
   {
@@ -60,6 +61,31 @@ export default function TasksPage() {
   const [userHandle, setUserHandle] = useState<string>("")
   const [isModalOpen, setIsModalOpen] = useState<boolean>(false)
   const {selectedAccount} = useWallet()
+
+  // Fetch completed tasks using TanStack Query
+  const { isLoading } = useQuery({
+    queryKey: ['completedTasks', selectedAccount?.address],
+    queryFn: async () => {
+      if (!selectedAccount?.address) return { tasks: [] }
+      
+      const response = await fetch(
+        `${import.meta.env.VITE_TASK_API_BASE_URL}/api/tasks/?walletAddress=${selectedAccount.address}`
+      )
+      
+      if (!response.ok) {
+        throw new Error('Failed to fetch completed tasks')
+      }
+      
+      const data = await response.json()
+      if (data.success) {
+        setCompleted(data.tasks.map((task: any) => task.taskId))
+        return data
+      }
+      return { tasks: [] }
+    },
+    enabled: !!selectedAccount?.address,
+    retry: 2,
+  })
 
   const totalPoints = completed.reduce((sum, id) => sum + (tasks.find((t) => t.id === id)?.points || 0), 0)
 
@@ -151,6 +177,13 @@ export default function TasksPage() {
         {error && (
           <div className="mb-6 p-4 bg-red-900/50 border border-red-700/50 rounded-lg text-red-200">
             {error}
+          </div>
+        )}
+
+        {/* Loading State */}
+        {isLoading && (
+          <div className="mb-6 p-4 bg-blue-900/50 border border-blue-700/50 rounded-lg text-blue-200">
+            Loading completed tasks...
           </div>
         )}
 
