@@ -80,7 +80,11 @@ export default function LeaderboardPage() {
                 {data.topUsers.map((user, index) => (
                   <div
                     key={user._id}
-                    className="flex items-center justify-between p-4 bg-gradient-to-r from-slate-900/60 to-slate-800/60 border border-slate-700/50 rounded-lg hover:border-blue-500/30 transition-all duration-300"
+                    className={`flex items-center justify-between p-4 rounded-lg border transition-all duration-300 ${
+                      selectedAccount?.address?.toLowerCase() === user.walletAddress.toLowerCase()
+                        ? 'bg-gradient-to-r from-blue-600/30 to-purple-600/30 border-blue-500/50'
+                        : 'bg-gradient-to-r from-slate-900/60 to-slate-800/60 border-slate-700/50 hover:border-blue-500/30'
+                    }`}
                   >
                     <div className="flex items-center gap-4">
                       <div className="flex-shrink-0">
