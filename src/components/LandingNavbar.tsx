@@ -4,15 +4,15 @@ import { FaSun, FaMoon } from "react-icons/fa";
 import logo from '/logo.svg';
 
 const LandingNavbar = ({ isOpen, setIsOpen, navItems, handleNavClick, navigate }) => (
-  <section className="py-4 lg:py-8 fixed w-full top-0 z-50 glass-card">
+  <section className="py-4 md:py-8 fixed w-full top-0 z-50 glass-card">
     <div className="container max-w-5xl mx-auto px-4">
       <div className="border border-border rounded-[27px] md:rounded-full glass-card max-w-5xl mx-auto">
-        <div className="grid grid-cols-2 lg:grid-cols-3 p-2 px-4 items-center">
+        <div className="grid grid-cols-2 md:grid-cols-3 p-2 px-4 items-center">
           <div className="flex items-center gap-2 cursor-pointer" onClick={() => navigate('/') }>
             <img src={logo} alt="company-logo" className="h-8 w-auto md:h-7" />
             <span className="text-xl font-semibold text-white">XORION</span>
           </div>
-          <div className="lg:flex justify-center items-center hidden">
+          <div className="md:flex justify-center items-center hidden">
             <nav className="flex gap-4 font-medium">
               {navItems.map((link) => (
                 <a
