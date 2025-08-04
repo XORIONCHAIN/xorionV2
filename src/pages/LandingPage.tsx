@@ -34,6 +34,7 @@ const LandingPage = () => {
     { name: 'Features', href: '#features' },
     { name: 'About', href: '#about' },
     { name: 'Community', href: '#community' },
+{ name: 'Tasks', href: '/tasks' },
   ];
 
   return (
