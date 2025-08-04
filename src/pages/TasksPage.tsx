@@ -16,6 +16,8 @@ import {
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { useQuery } from "@tanstack/react-query"
+import { Link } from "react-router-dom";
+
 
 const tasks = [
   {
@@ -171,6 +173,14 @@ export default function TasksPage() {
             Earn Points by Completing Tasks
           </h1>
           <p className="text-gray-400 text-lg">Complete tasks to earn points and unlock exclusive rewards</p>
+
+   <Link to="/tasks/leaderboard">
+          <Button className="mt-4 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 text-white px-6 py-2 rounded-xl">
+            View Leaderboard
+          </Button>
+        </Link>
+
+
         </div>
 
         {/* Error Message */}
