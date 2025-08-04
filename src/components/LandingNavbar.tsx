@@ -1,6 +1,7 @@
 import React from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { FaSun, FaMoon, FaBars } from "react-icons/fa"; // Added FaBars for hamburger menu
+import { FaSun, FaMoon, FaBars } from "react-icons/fa";
+import { Link } from 'react-router-dom'; // Import Link from react-router-dom
 import logo from '/logo.svg';
 
 const LandingNavbar = ({ isOpen, setIsOpen, navItems, handleNavClick, navigate }) => (
@@ -25,14 +26,14 @@ const LandingNavbar = ({ isOpen, setIsOpen, navItems, handleNavClick, navigate }
           <div className="hidden md:flex justify-center items-center col-span-1">
             <nav className="flex gap-4 font-medium">
               {navItems.map((link) => (
-                <a
-                  href={link.href}
+                <Link
+                  to={link.href}
                   key={link.name}
                   onClick={(e) => handleNavClick(e, link.href)}
                   className="text-muted-foreground hover:text-primary transition-colors"
                 >
                   {link.name}
-                </a>
+                </Link>
               ))}
             </nav>
           </div>
@@ -59,8 +60,8 @@ const LandingNavbar = ({ isOpen, setIsOpen, navItems, handleNavClick, navigate }
             >
               <div className="flex flex-col items-center gap-4 py-4 bg-gray-900/90">
                 {navItems.map((link) => (
-                  <a
-                    href={link.href}
+                  <Link
+                    to={link.href}
                     key={link.name}
                     onClick={(e) => {
                       handleNavClick(e, link.href);
@@ -69,7 +70,7 @@ const LandingNavbar = ({ isOpen, setIsOpen, navItems, handleNavClick, navigate }
                     className="text-muted-foreground hover:text-primary transition-colors text-lg"
                   >
                     {link.name}
-                  </a>
+                  </Link>
                 ))}
                 <button
                   className="w-full max-w-[200px] bg-gradient-to-r from-pink-500 via-purple-500 to-pink-400 text-white rounded-full py-2 font-semibold shadow hover:from-purple-500 hover:to-pink-500 transition-all border border-white/10"
