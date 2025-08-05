@@ -1,5 +1,7 @@
 import { useState } from "react"
 import { useQuery } from "@tanstack/react-query"
+import { Link } from "react-router-dom"
+import axios from "axios"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { FaCopy } from "react-icons/fa"
@@ -15,23 +17,34 @@ interface LeaderboardUser {
 
 export default function LeaderboardPage() {
   const [copiedAddress, setCopiedAddress] = useState<string | null>(null)
-    const {selectedAccount} = useWallet()
-  
+  const { selectedAccount } = useWallet()
 
-  // Fetch leaderboard data using TanStack Query
-  const { data, isLoading, error } = useQuery<{
+  // Fetch leaderboard data using TanStack Query with axios
+  const { data, isLoading, error, refetch } = useQuery<{
     success: boolean
     topUsers: LeaderboardUser[]
   }>({
     queryKey: ['leaderboard'],
     queryFn: async () => {
-      const response = await fetch(
-        `${import.meta.env.VITE_TASK_API_BASE_URL}/api/tasks/leaderboard`
-      )
-      if (!response.ok) {
-        throw new Error('Failed to fetch leaderboard')
+      try {
+        const response = await axios.get(
+          `${import.meta.env.VITE_TASK_API_BASE_URL}/api/tasks/leaderboard`,
+          {
+            timeout: 10000, // 10 second timeout
+            headers: {
+              'Accept': 'application/json',
+            },
+          }
+        )
+        return response.data
+      } catch (error) {
+        if (axios.isAxiosError(error)) {
+          const message = error.response?.data?.message || error.message
+          const status = error.response?.status || 'Unknown'
+          throw new Error(`Failed to fetch leaderboard: ${status} - ${message}`)
+        }
+        throw new Error('An unexpected error occurred while fetching the leaderboard')
       }
-      return response.json()
     },
     retry: 2,
   })
@@ -58,13 +71,39 @@ export default function LeaderboardPage() {
           <h1 className="text-4xl md:text-5xl font-bold mb-4 bg-gradient-to-r from-blue-400 via-purple-400 to-pink-400 bg-clip-text text-transparent">
             Tasks Leaderboard
           </h1>
-          <p className="text-gray-400 text-lg">See who’s leading the way in earning points!</p>
+          <p className="text-gray-400 text-lg">See who's leading the way in earning points!</p>
+        </div>
+
+        {/* Back Button */}
+        <div className="mb-6">
+          <Link to="/tasks">
+            <Button 
+              variant="outline" 
+              className="bg-transparent border-blue-500/50 text-blue-400 hover:bg-blue-500/20 hover:text-blue-300"
+            >
+              Back to Tasks
+            </Button>
+          </Link>
         </div>
 
         {/* Error Message */}
         {error && (
-          <div className="mb-6 p-4 bg-red-900/50 border border-red-700/50 rounded-lg text-red-200">
-            {error instanceof Error ? error.message : "An error occurred while fetching the leaderboard"}
+          <div className="mb-6 p-4 bg-red-900/50 border border-red-700/50 rounded-lg">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-red-200 mb-2">
+                  {error instanceof Error ? error.message : "An error occurred while fetching the leaderboard"}
+                </p>
+              </div>
+              <Button
+                onClick={() => refetch()}
+                variant="outline"
+                size="sm"
+                className="bg-transparent border-red-400/50 text-red-300 hover:bg-red-500/20 hover:text-red-200 hover:border-red-400"
+              >
+                Retry
+              </Button>
+            </div>
           </div>
         )}
 

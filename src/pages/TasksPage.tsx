@@ -17,6 +17,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { useQuery } from "@tanstack/react-query"
 import { Link } from "react-router-dom";
+import axios from 'axios'
 
 const tasks = [
   {
@@ -68,20 +69,25 @@ export default function TasksPage() {
     queryFn: async () => {
       if (!selectedAccount?.address) return { tasks: [] }
 
-      const response = await fetch(
-        `${import.meta.env.VITE_TASK_API_BASE_URL}/api/tasks/?walletAddress=${selectedAccount.address}`
-      )
+      try {
+        const response = await axios.get(
+          `${import.meta.env.VITE_TASK_API_BASE_URL}/api/tasks/`,
+          {
+            params: {
+              walletAddress: selectedAccount.address
+            }
+          }
+        )
 
-      if (!response.ok) {
+        if (response.data.success) {
+          setCompleted(response.data.tasks.map((task: any) => task.taskId))
+          return response.data
+        }
+        return { tasks: [] }
+      } catch (error) {
+        console.error('Failed to fetch completed tasks:', error)
         throw new Error('Failed to fetch completed tasks')
       }
-
-      const data = await response.json()
-      if (data.success) {
-        setCompleted(data.tasks.map((task: any) => task.taskId))
-        return data
-      }
-      return { tasks: [] }
     },
     enabled: !!selectedAccount?.address,
     retry: 2,
@@ -112,34 +118,38 @@ export default function TasksPage() {
       setError(null)
       setIsModalOpen(false)
 
-      const response = await fetch(`${import.meta.env.VITE_TASK_API_BASE_URL}/api/tasks/verify`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
+      const response = await axios.post(
+        `${import.meta.env.VITE_TASK_API_BASE_URL}/api/tasks/verify`,
+        {
           walletAddress: selectedAccount.address,
           taskId: currentTask.id,
           userHandle: userHandle.trim()
-        }),
-      })
+        },
+        {
+          headers: {
+            "Content-Type": "application/json",
+          }
+        }
+      )
 
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}))
-        throw new Error(errorData.error || errorData.message || `Server error: ${response.status}`)
-      }
-
-      const result = await response.json()
-
-      if (result.success) {
+      if (response.data.success) {
         setCompleted((prev) => [...prev, currentTask.id])
       } else {
-        throw new Error(result.error || result.message || "Task verification failed")
+        throw new Error(response.data.error || response.data.message || "Task verification failed")
       }
     } catch (err) {
       console.error("Task verification error:", err)
-      if (err instanceof TypeError && err.message === "Failed to fetch") {
-        setError("Network error. Please check your connection and try again.")
+      
+      if (axios.isAxiosError(err)) {
+        if (err.code === 'ECONNABORTED' || err.message === 'Network Error') {
+          setError("Network error. Please check your connection and try again.")
+        } else if (err.response) {
+          // Server responded with error status
+          const errorData = err.response.data
+          setError(errorData.error || errorData.message || `Server error: ${err.response.status}`)
+        } else {
+          setError("Network error. Please check your connection and try again.")
+        }
       } else {
         setError(err instanceof Error ? err.message : "An unknown error occurred")
       }
