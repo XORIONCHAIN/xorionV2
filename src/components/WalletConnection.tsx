@@ -21,24 +21,73 @@ const POPULAR_WALLETS = [
   { name: 'subwallet-js', title: 'SubWallet' },
 ];
 
-// Cache for wallet installation status
-const walletCache = new Map<string, boolean>();
-let cacheInitialized = false;
+// Optimized wallet cache with immediate initialization
+class WalletCache {
+  private cache = new Map<string, boolean>();
+  private initialized = false;
+  private observers: (() => void)[] = [];
 
-// Initialize wallet cache immediately
-const initializeWalletCache = () => {
-  if (cacheInitialized || typeof window === 'undefined') return;
+  constructor() {
+    // Initialize immediately when class is instantiated
+    this.initialize();
+  }
 
-  POPULAR_WALLETS.forEach(wallet => {
-    walletCache.set(wallet.name, !!(window as any).injectedWeb3?.[wallet.name]);
-  });
-  cacheInitialized = true;
-};
+  private initialize() {
+    if (this.initialized || typeof window === 'undefined') return;
+    
+    // Check synchronously for immediate results
+    POPULAR_WALLETS.forEach(wallet => {
+      const isInstalled = !!(window as any).injectedWeb3?.[wallet.name];
+      this.cache.set(wallet.name, isInstalled);
+    });
+    
+    this.initialized = true;
+    this.notifyObservers();
+  }
 
-// Fast wallet check using cache
-const checkWalletInstalled = (walletName: string): boolean => {
-  if (!cacheInitialized) initializeWalletCache();
-  return walletCache.get(walletName) || false;
+  isInstalled(walletName: string): boolean {
+    if (!this.initialized) this.initialize();
+    return this.cache.get(walletName) || false;
+  }
+
+  getInstalled(): string[] {
+    if (!this.initialized) this.initialize();
+    return POPULAR_WALLETS
+      .filter(wallet => this.cache.get(wallet.name))
+      .map(wallet => wallet.name);
+  }
+
+  refresh() {
+    this.initialize();
+  }
+
+  subscribe(callback: () => void) {
+    this.observers.push(callback);
+    return () => {
+      this.observers = this.observers.filter(obs => obs !== callback);
+    };
+  }
+
+  private notifyObservers() {
+    this.observers.forEach(callback => callback());
+  }
+}
+
+// Global wallet cache instance
+const walletCache = new WalletCache();
+
+// Pre-enable web3 with debouncing
+let web3EnablePromise: Promise<any> | null = null;
+const enableWeb3 = () => {
+  if (!web3EnablePromise) {
+    web3EnablePromise = web3Enable('Xorion Blockchain Explorer')
+      .catch(error => {
+        console.warn('Web3 enable failed:', error);
+        web3EnablePromise = null; // Reset on failure
+        throw error;
+      });
+  }
+  return web3EnablePromise;
 };
 
 // Wallet context types
@@ -131,15 +180,46 @@ const WalletConnection = () => {
   const { selectedWallet, setSelectedWallet, selectedAccount, setSelectedAccount, balance, setBalance, disconnectWallet } = useWallet();
 
   // Refs for optimization
-  const web3EnabledRef = useRef(false);
   const balanceAbortControllerRef = useRef<AbortController | null>(null);
   const reconnectionAttemptedRef = useRef(false);
+  const accountsFetchAbortRef = useRef<AbortController | null>(null);
 
-  // Pre-initialize wallet cache on component mount
+  // Pre-enable web3 on component mount for faster subsequent operations
   useEffect(() => {
-    initializeWalletCache();
+    enableWeb3().catch(() => {
+      // Silently handle error, will retry when needed
+    });
   }, []);
 
+  // Optimized wallet detection with immediate cache response
+  useEffect(() => {
+    if (modalOpen && step === 'wallets') {
+      // Immediately set installed wallets from cache
+      const updateInstalledWallets = () => {
+        const installedNames = walletCache.getInstalled();
+        const installed = POPULAR_WALLETS
+          .filter(wallet => installedNames.includes(wallet.name))
+          .map(wallet => ({ ...wallet, installed: true }));
+        
+        setInstalledWallets(installed);
+      };
+
+      // Set initial state immediately
+      updateInstalledWallets();
+
+      // Subscribe to cache updates
+      const unsubscribe = walletCache.subscribe(updateInstalledWallets);
+
+      // Refresh cache in background (non-blocking)
+      setTimeout(() => {
+        walletCache.refresh();
+      }, 0);
+
+      return unsubscribe;
+    }
+  }, [modalOpen, step]);
+
+  // Optimized reconnection logic
   useEffect(() => {
     if (reconnectionAttemptedRef.current || apiState.status !== 'connected') return;
 
@@ -150,29 +230,31 @@ const WalletConnection = () => {
 
       const { walletName, accountAddress, accountSource } = savedConnection;
 
-      // Check if the wallet is still installed
-      if (!checkWalletInstalled(walletName)) {
+      // Fast check using cache
+      if (!walletCache.isInstalled(walletName)) {
         clearWalletConnection();
         return;
       }
 
       try {
-        // Re-enable web3
-        await web3Enable('Xorion Blockchain Explorer');
-        web3EnabledRef.current = true;
+        // Use the pre-enabled web3 or enable it
+        await enableWeb3();
 
-        // Find the wallet in POPULAR_WALLETS
         const wallet = POPULAR_WALLETS.find(w => w.name === walletName);
         if (!wallet) {
           clearWalletConnection();
           return;
         }
 
-        // Set the selected wallet
         setSelectedWallet({ ...wallet, installed: true });
 
-        // Fetch accounts
-        const accounts = await web3Accounts({ extensions: [walletName] });
+        // Optimized account fetching with timeout
+        const accountsPromise = web3Accounts({ extensions: [walletName] });
+        const timeoutPromise = new Promise((_, reject) =>
+          setTimeout(() => reject(new Error('Timeout')), 2000)
+        );
+
+        const accounts = await Promise.race([accountsPromise, timeoutPromise]) as InjectedAccountWithMeta[];
         const matchingAccount = accounts.find(
           (acc: InjectedAccountWithMeta) =>
             acc.address === accountAddress && acc.meta.source === accountSource
@@ -203,70 +285,66 @@ const WalletConnection = () => {
     reconnectWallet();
   }, [apiState.status, setSelectedWallet, setSelectedAccount, toast]);
 
-  // Optimized wallet checking - no delays, immediate response
-  useEffect(() => {
-    if (modalOpen && step === 'wallets') {
-      // Immediately check installed wallets from cache
-      const installed = POPULAR_WALLETS.filter(wallet =>
-        checkWalletInstalled(wallet.name)
-      ).map(wallet => ({
-        ...wallet,
-        installed: true
-      }));
-
-      setInstalledWallets(installed);
-
-      // Enable web3 in background if not already done
-      if (!web3EnabledRef.current) {
-        web3Enable('Xorion Blockchain Explorer').then(() => {
-          web3EnabledRef.current = true;
-          // Re-check after enabling (in case some wallets weren't detected initially)
-          setTimeout(() => {
-            const recheckInstalled = POPULAR_WALLETS.filter(wallet =>
-              checkWalletInstalled(wallet.name)
-            ).map(wallet => ({
-              ...wallet,
-              installed: true
-            }));
-            setInstalledWallets(recheckInstalled);
-          }, 50);
-        }).catch(() => {
-          // Silently handle error, wallets already shown from cache
-        });
-      }
-    }
-  }, [modalOpen, step]);
-
-  // Optimized account fetching
+  // Ultra-optimized account fetching
   useEffect(() => {
     if (step === 'accounts' && selectedWallet) {
       setLoading(true);
 
-      // Use Promise.race to timeout after 3 seconds
-      const fetchPromise = web3Accounts({ extensions: [selectedWallet.name] });
-      const timeoutPromise = new Promise((_, reject) =>
-        setTimeout(() => reject(new Error('Timeout')), 3000)
-      );
+      // Cancel previous request
+      if (accountsFetchAbortRef.current) {
+        accountsFetchAbortRef.current.abort();
+      }
 
-      Promise.race([fetchPromise, timeoutPromise])
+      accountsFetchAbortRef.current = new AbortController();
+      const signal = accountsFetchAbortRef.current.signal;
+
+      // Use the pre-enabled web3 and set shorter timeout
+      Promise.race([
+        web3Accounts({ extensions: [selectedWallet.name] }),
+        new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout')), 1500))
+      ])
         .then((accs: any) => {
-          setAccounts(accs);
+          if (!signal.aborted) {
+            setAccounts(accs);
+          }
         })
-        .catch(() => {
-          toast({
-            title: 'Error',
-            description: 'Failed to fetch accounts. Please unlock your wallet.',
-            variant: 'destructive',
-          });
-          setAccounts([]);
+        .catch((error) => {
+          if (!signal.aborted) {
+            console.warn('Account fetch failed:', error);
+            toast({
+              title: 'Error',
+              description: 'Failed to fetch accounts. Please unlock your wallet and try again.',
+              variant: 'destructive',
+            });
+            setAccounts([]);
+          }
         })
-        .finally(() => setLoading(false));
+        .finally(() => {
+          if (!signal.aborted) {
+            setLoading(false);
+          }
+        });
+
+      return () => {
+        if (accountsFetchAbortRef.current) {
+          accountsFetchAbortRef.current.abort();
+        }
+      };
     }
   }, [step, selectedWallet, toast]);
 
-  // Optimized balance fetching with abort controller
+  // Optimized balance fetching with caching
+  const balanceCache = useRef<Map<string, { balance: string; timestamp: number }>>(new Map());
+  
   useEffect(() => {
     if (api && apiState.status === 'connected' && selectedAccount && modalOpen) {
+      // Check cache first (5 second cache)
+      const cached = balanceCache.current.get(selectedAccount.address);
+      if (cached && Date.now() - cached.timestamp < 5000) {
+        setBalance(cached.balance);
+        return;
+      }
+
       // Cancel previous balance request
       if (balanceAbortControllerRef.current) {
         balanceAbortControllerRef.current.abort();
@@ -278,13 +356,18 @@ const WalletConnection = () => {
       api.query.system.account(selectedAccount.address)
         .then((info: any) => {
           if (!signal.aborted) {
-            setBalance(info.data.free.toString());
+            const balance = info.data.free.toString();
+            setBalance(balance);
+            // Cache the result
+            balanceCache.current.set(selectedAccount.address, {
+              balance,
+              timestamp: Date.now()
+            });
           }
         })
         .catch((e: any) => {
           if (!signal.aborted) {
             console.warn('Balance fetch failed:', e.message);
-            // Don't show toast for balance errors to avoid spam
           }
         });
     }
@@ -296,9 +379,26 @@ const WalletConnection = () => {
     };
   }, [api, apiState.status, selectedAccount, modalOpen]);
 
-  const handleWalletSelect = useCallback((wallet: any) => {
+  const handleWalletSelect = useCallback(async (wallet: any) => {
     setSelectedWallet(wallet);
     setStep('accounts');
+    
+    // Pre-fetch accounts immediately to reduce perceived delay
+    setLoading(true);
+    try {
+      await enableWeb3(); // Ensure web3 is enabled
+      const accounts = await Promise.race([
+        web3Accounts({ extensions: [wallet.name] }),
+        new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout')), 1500))
+      ]) as InjectedAccountWithMeta[];
+      
+      setAccounts(accounts);
+    } catch (error) {
+      console.warn('Pre-fetch accounts failed:', error);
+      // Will be handled by the useEffect
+    } finally {
+      setLoading(false);
+    }
   }, [setSelectedWallet]);
 
   const handleAccountSelect = useCallback((account: InjectedAccountWithMeta) => {
@@ -317,6 +417,8 @@ const WalletConnection = () => {
     setStep('wallets');
     setModalOpen(false);
     clearWalletConnection();
+    // Clear balance cache
+    balanceCache.current.clear();
     toast({
       title: 'Disconnected',
       description: 'Wallet disconnected',
