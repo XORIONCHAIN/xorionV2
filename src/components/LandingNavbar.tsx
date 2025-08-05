@@ -1,7 +1,6 @@
-import React from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { FaSun, FaMoon, FaBars } from "react-icons/fa";
-import { Link } from 'react-router-dom'; // Import Link from react-router-dom
+import { FaBars } from "react-icons/fa";
+import { Link } from 'react-router-dom'; 
 import logo from '/logo.svg';
 
 const LandingNavbar = ({ isOpen, setIsOpen, navItems, handleNavClick, navigate }) => (
