@@ -4,6 +4,8 @@ import { web3Accounts, web3Enable, web3FromAddress } from '@polkadot/extension-d
 import { FiDroplet, FiRefreshCw, FiInfo, FiZap, FiCopy, FiCheckCircle, FiAlertCircle } from 'react-icons/fi';
 import { MdAccountBalanceWallet } from 'react-icons/md';
 import { useWallet } from './WalletConnection';
+import { Link } from 'react-router-dom';
+
 
 // AIRDROP MANAGER CLASS
 class AirdropManager {
@@ -220,6 +222,15 @@ export default function AirdropPanel() {
         <FiAlertCircle className="mr-1" /> {error}
       </div>
     )}
+
+<Link
+        to="/tasks"
+        className="mt-4 w-full flex items-center justify-center gap-2 py-3 px-5 rounded-lg text-base font-semibold shadow-md transition bg-gradient-to-r from-[#4b0082] via-[#1e90ff] to-[#ff4500] text-white hover:from-[#6a5acd] hover:to-[#ff6347]"
+        style={{ fontWeight: 700, letterSpacing: 0.5 }}
+      >
+        <FiInfo size={20} />
+        View Tasks
+      </Link>
   </div>
   );
 }
