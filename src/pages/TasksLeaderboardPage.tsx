@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button"
 import { FaCopy } from "react-icons/fa"
 import Header from '@/components/Header'
 import Footer from "@/components/Footer"
+import { useWallet } from "@/components/WalletConnection"
 
 interface LeaderboardUser {
   _id: string
@@ -14,6 +15,8 @@ interface LeaderboardUser {
 
 export default function LeaderboardPage() {
   const [copiedAddress, setCopiedAddress] = useState<string | null>(null)
+    const {selectedAccount} = useWallet()
+  
 
   // Fetch leaderboard data using TanStack Query
   const { data, isLoading, error } = useQuery<{
