@@ -336,9 +336,7 @@ export default function TasksPage() {
         <DialogContent className="bg-slate-900 border-slate-700 max-w-md">
           <DialogHeader>
             <DialogTitle className="text-white text-lg sm:text-xl">
-              {currentTask?.task?.id === 'follow-discord' ? 'Verify Discord Join' : 
-               currentTask?.task?.id === 'join-telegram' ? 'Verify Telegram Join' : 
-               'Verify Twitter Follow'}
+              Verify {currentTask?.task?.label || "Task"}
             </DialogTitle>
             <DialogDescription className="text-slate-400 text-sm sm:text-base">
               {currentTask?.task?.id === 'follow-discord' 
