@@ -341,7 +341,7 @@ export default function TasksPage() {
             <DialogDescription className="text-slate-400 text-sm sm:text-base">
               {currentTask?.task?.id === 'follow-discord' 
                 ? "Please enter your Discord username to verify you've joined our server."
-                : currentTask?.task?.id === 'join-telegram'
+                : currentTask?.task?.id === 'join-telegram' || currentTask?.task?.id === 'join-telegram-channel' 
                 ? "Please enter your Telegram User ID (not username) to verify you've joined our group. You can find your User ID using @userinfobot on Telegram."
                 : "Please enter your Twitter (X) username to verify you've followed us."
               }
