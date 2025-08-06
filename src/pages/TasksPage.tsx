@@ -53,6 +53,17 @@ const tasks = [
     handlePlaceholder: "e.g., 6817379249",
     handleNote: "Enter your Telegram User ID (a numeric ID, not your username). Find it via @userinfobot"
   },
+  {
+    id: "join-telegram-channel",
+    label: "Join our Telegram Channel",
+    description: "Join our Telegram community and earn 100 points.",
+    icon: FaTelegram,
+    link: "https://t.me/XorionChainChannel",
+    points: 100,
+    handleLabel: "Telegram User ID",
+    handlePlaceholder: "e.g., 6817379249",
+    handleNote: "Enter your Telegram User ID (a numeric ID, not your username). Find it via @userinfobot"
+  },
 ]
 
 export default function TasksPage() {
