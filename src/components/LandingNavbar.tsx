@@ -23,13 +23,13 @@ const LandingNavbar = ({ isOpen, setIsOpen, navItems, handleNavClick, navigate }
 
           {/* Desktop Navigation */}
           <div className="hidden md:flex justify-center items-center col-span-1">
-            <nav className="flex gap-4 font-medium">
+            <nav className="flex gap-3 lg:gap-4 font-medium items-center">
               {navItems.map((link) => (
                 <Link
                   to={link.href}
                   key={link.name}
                   onClick={(e) => handleNavClick(e, link.href)}
-                  className="text-muted-foreground hover:text-primary transition-colors"
+                  className="text-muted-foreground hover:text-primary transition-colors text-sm lg:text-base whitespace-nowrap px-2 py-1 rounded-lg hover:bg-white/5"
                 >
                   {link.name}
                 </Link>
@@ -40,7 +40,7 @@ const LandingNavbar = ({ isOpen, setIsOpen, navItems, handleNavClick, navigate }
           {/* Explore Button */}
           <div className="hidden md:flex justify-end col-span-1">
             <button
-              className="bg-gradient-to-r from-pink-500 via-purple-500 to-pink-400 text-white rounded-full px-6 py-2 font-semibold shadow backdrop-blur-xl hover:from-purple-500 hover:to-pink-500 transition-all border border-white/10"
+              className="bg-gradient-to-r from-pink-500 via-purple-500 to-pink-400 text-white rounded-full px-4 lg:px-6 py-2 font-semibold text-sm lg:text-base shadow backdrop-blur-xl hover:from-purple-500 hover:to-pink-500 transition-all border border-white/10 whitespace-nowrap"
               onClick={() => navigate('/explorer')}
             >
               Explore
