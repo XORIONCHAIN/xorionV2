@@ -48,22 +48,22 @@ const formatToken = (amount: string | BN | number, decimals = 18, unit = 'tXOR',
 
 const TransferFunds = () => {
   const { toast } = useToast();
-  
+
   // POLKADOT STORE CONNECTION
-  const { 
-    api, 
-    apiState, 
-    connect, 
-    disconnect 
+  const {
+    api,
+    apiState,
+    connect,
+    disconnect
   } = usePolkadotStore();
-  
+
   // LOCAL COMPONENT STATE
   const [accounts, setAccounts] = useState<InjectedAccountWithMeta[]>([]);
   const [selectedAccount, setSelectedAccount] = useState<InjectedAccountWithMeta | null>(null);
   const [balance, setBalance] = useState<string>('0');
   const [transferableBalance, setTransferableBalance] = useState<string>('0');
   const [lockedBalance, setLockedBalance] = useState<string>('0');
-  
+
   // TRANSFER STATE
   const [recipient, setRecipient] = useState('');
   const [amount, setAmount] = useState('');
@@ -78,18 +78,18 @@ const TransferFunds = () => {
   // LOAD WALLET ACCOUNTS
   useEffect(() => {
     let mounted = true;
-    
+
     const loadAccounts = async () => {
       try {
         if (accounts.length > 0) return;
-        
+
         const extensions = await web3Enable('xorion-transfer-app');
         if (extensions.length === 0) {
           throw new Error('No Polkadot.js extension found');
         }
-        
+
         const allAccounts = await web3Accounts();
-        
+
         if (mounted) {
           setAccounts(allAccounts);
           if (allAccounts.length > 0 && !selectedAccount) {
@@ -109,7 +109,7 @@ const TransferFunds = () => {
     };
 
     loadAccounts();
-    
+
     return () => {
       mounted = false;
     };
@@ -128,7 +128,7 @@ const TransferFunds = () => {
 
     try {
       const { data: { free, reserved, frozen } } = await api.query.system.account(selectedAccount.address);
-      
+
       let stakingLocked = new BN(0);
       try {
         const stakingLedger = await api.query.staking.ledger(selectedAccount.address);
@@ -139,14 +139,14 @@ const TransferFunds = () => {
       } catch (e) {
         // Account not staking
       }
-      
+
       setBalance(free.toString());
       const totalLocked = BN.max(frozen, reserved, stakingLocked);
       setLockedBalance(totalLocked.toString());
-      
+
       const transferableKeepAlive = free.sub(totalLocked).sub(XORION_CHAIN_CONFIG.existentialDeposit);
       setTransferableBalance(transferableKeepAlive.isNeg() ? '0' : transferableKeepAlive.toString());
-      
+
     } catch (error) {
       console.error('Error fetching account info:', error);
       setBalance('0');
@@ -158,12 +158,12 @@ const TransferFunds = () => {
   // FETCH BALANCE WITH OPTIMIZED INTERVAL
   useEffect(() => {
     if (!isConnected || !selectedAccount) return;
-    
+
     fetchAccountInfo();
-    
+
     // ONLY SET INTERVAL IF WE HAVE A CONNECTED API AND SELECTED ACCOUNT
     const interval = setInterval(fetchAccountInfo, 15000); // Increased to 15s
-    
+
     return () => clearInterval(interval);
   }, [fetchAccountInfo, isConnected, selectedAccount]);
 
@@ -181,24 +181,24 @@ const TransferFunds = () => {
   // CONVERT tXOR AMOUNT TO IONS - MEMOIZED
   const tXORToIons = useCallback((amount: string): BN => {
     if (!amount || amount === '0' || amount === '') return new BN(0);
-    
+
     try {
       const cleanAmount = amount.replace(/,/g, '');
       const numAmount = parseFloat(cleanAmount);
-      
+
       if (!isFinite(numAmount) || numAmount < 0) return new BN(0);
-      
+
       const strAmount = numAmount.toFixed(18);
       const [whole, decimal = ''] = strAmount.split('.');
-      
+
       const wholeBN = new BN(whole).mul(XORION_CHAIN_CONFIG.unit);
-      
+
       let decimalBN = new BN(0);
       if (decimal && decimal !== '000000000000000000') {
         const decimalPadded = decimal.padEnd(18, '0');
         decimalBN = new BN(decimalPadded);
       }
-      
+
       return wholeBN.add(decimalBN);
     } catch (error) {
       console.error('Error converting tXOR to ions:', error);
@@ -209,31 +209,31 @@ const TransferFunds = () => {
   // CONVERT IONS BACK TO tXOR - MEMOIZED
   const ionsToTXOR = useCallback((ions: BN): string => {
     if (ions.isZero()) return '0';
-    
+
     const wholePart = ions.div(XORION_CHAIN_CONFIG.unit);
     const decimalPart = ions.mod(XORION_CHAIN_CONFIG.unit);
-    
+
     if (decimalPart.isZero()) {
       return wholePart.toString();
     }
-    
+
     const decimalStr = decimalPart.toString().padStart(18, '0');
     const trimmedDecimal = decimalStr.replace(/0+$/, '');
-    
+
     if (trimmedDecimal === '') {
       return wholePart.toString();
     }
-    
+
     return `${wholePart.toString()}.${trimmedDecimal}`;
   }, []);
 
   // CALCULATE MAXIMUM TRANSFERABLE AMOUNT - MEMOIZED
   const getMaxTransferableAmount = useCallback((): BN => {
     if (!selectedAccount || !balance) return new BN(0);
-    
+
     const freeBN = new BN(balance);
     const lockedBN = new BN(lockedBalance);
-    
+
     if (transferType === 'transferKeepAlive') {
       const maxAmount = freeBN.sub(lockedBN).sub(XORION_CHAIN_CONFIG.existentialDeposit);
       return maxAmount.isNeg() ? new BN(0) : maxAmount;
@@ -255,22 +255,22 @@ const TransferFunds = () => {
     if (!amountStr || amountStr === '') {
       return { isValid: true };
     }
-    
+
     try {
       const numAmount = parseFloat(amountStr.replace(/,/g, ''));
-      
+
       if (!isFinite(numAmount) || numAmount <= 0) {
         return { isValid: false, error: 'Amount must be a positive number' };
       }
-      
+
       const amountInIons = tXORToIons(amountStr);
       const availableInIons = new BN(transferableBalance);
-      
+
       if (amountInIons.gt(availableInIons)) {
         const availableInTXOR = ionsToTXOR(availableInIons);
         return { isValid: false, error: `Insufficient balance. Available: ${availableInTXOR} tXOR` };
       }
-      
+
       return { isValid: true };
     } catch (error) {
       return { isValid: false, error: 'Invalid number format' };
@@ -304,24 +304,24 @@ const TransferFunds = () => {
 
     try {
       const amountInIons = tXORToIons(amount);
-      
-      const transfer = transferType === 'transferKeepAlive' 
+
+      const transfer = transferType === 'transferKeepAlive'
         ? api.tx.balances.transferKeepAlive(recipient, amountInIons)
         : api.tx.balances.transferAllowDeath(recipient, amountInIons);
-      
+
       const { partialFee } = await transfer.paymentInfo(selectedAccount.address);
-      
+
       const totalRequired = amountInIons.add(partialFee);
       const availableForFees = new BN(balance).sub(new BN(lockedBalance));
-      
+
       if (transferType === 'transferKeepAlive') {
         const afterTransferBalance = availableForFees.sub(totalRequired);
         if (afterTransferBalance.lt(XORION_CHAIN_CONFIG.existentialDeposit)) {
           const requiredTXOR = ionsToTXOR(totalRequired.add(XORION_CHAIN_CONFIG.existentialDeposit));
-          toast({ 
-            title: 'Insufficient Balance', 
+          toast({
+            title: 'Insufficient Balance',
             description: `Need ${requiredTXOR} tXOR including fees and minimum balance`,
-            variant: 'destructive' 
+            variant: 'destructive'
           });
           setLoading(false);
           return;
@@ -347,19 +347,19 @@ const TransferFunds = () => {
         { signer: injector.signer },
         ({ status, dispatchError, txHash }) => {
           if (status.isInBlock) {
-            toast({ 
-              title: 'Transaction In Block', 
-              description: `Transaction included in block ${status.asInBlock.toString().slice(0, 10)}...` 
+            toast({
+              title: 'Transaction In Block',
+              description: `Transaction included in block ${status.asInBlock.toString().slice(0, 10)}...`
             });
 
-            setTransferHistory(prev => 
-              prev.map(tx => 
-                tx.id === pendingTransfer.id 
-                  ? { 
-                      ...tx, 
-                      hash: txHash.toHex(), 
-                      blockHash: status.asInBlock.toString()
-                    }
+            setTransferHistory(prev =>
+              prev.map(tx =>
+                tx.id === pendingTransfer.id
+                  ? {
+                    ...tx,
+                    hash: txHash.toHex(),
+                    blockHash: status.asInBlock.toString()
+                  }
                   : tx
               )
             );
@@ -368,37 +368,37 @@ const TransferFunds = () => {
           if (status.isFinalized) {
             if (dispatchError) {
               let errorMessage = 'Transaction failed';
-              
+
               if (dispatchError.isModule) {
                 const decoded = api.registry.findMetaError(dispatchError.asModule);
                 errorMessage = `${decoded.section}.${decoded.name}: ${decoded.docs.join(' ')}`;
               }
 
-              setTransferHistory(prev => 
-                prev.map(tx => 
-                  tx.id === pendingTransfer.id 
+              setTransferHistory(prev =>
+                prev.map(tx =>
+                  tx.id === pendingTransfer.id
                     ? { ...tx, status: 'failed' as const }
                     : tx
                 )
               );
 
-              toast({ 
-                title: 'Transfer Failed', 
-                description: errorMessage, 
-                variant: 'destructive' 
+              toast({
+                title: 'Transfer Failed',
+                description: errorMessage,
+                variant: 'destructive'
               });
             } else {
-              setTransferHistory(prev => 
-                prev.map(tx => 
-                  tx.id === pendingTransfer.id 
+              setTransferHistory(prev =>
+                prev.map(tx =>
+                  tx.id === pendingTransfer.id
                     ? { ...tx, status: 'success' as const, hash: txHash.toHex() }
                     : tx
                 )
               );
 
-              toast({ 
-                title: 'Transfer Successful', 
-                description: `Successfully sent ${amount} tXOR` 
+              toast({
+                title: 'Transfer Successful',
+                description: `Successfully sent ${amount} tXOR`
               });
 
               setAmount('');
@@ -413,19 +413,19 @@ const TransferFunds = () => {
 
     } catch (error: any) {
       console.error('Transfer error:', error);
-      
-      setTransferHistory(prev => 
-        prev.map(tx => 
-          tx.timestamp.getTime() === Date.now() 
+
+      setTransferHistory(prev =>
+        prev.map(tx =>
+          tx.timestamp.getTime() === Date.now()
             ? { ...tx, status: 'failed' as const }
             : tx
         )
       );
 
-      toast({ 
-        title: 'Transfer Error', 
-        description: error.message || 'An unexpected error occurred', 
-        variant: 'destructive' 
+      toast({
+        title: 'Transfer Error',
+        description: error.message || 'An unexpected error occurred',
+        variant: 'destructive'
       });
       setLoading(false);
     }
@@ -531,8 +531,8 @@ const TransferFunds = () => {
                 {/* Account Selection */}
                 <div>
                   <label className="text-sm font-medium text-white mb-2 block">From Account</label>
-                  <Select 
-                    value={selectedAccount?.address || ''} 
+                  <Select
+                    value={selectedAccount?.address || ''}
                     onValueChange={(address) => {
                       const account = accounts.find(acc => acc.address === address);
                       setSelectedAccount(account || null);
@@ -556,22 +556,22 @@ const TransferFunds = () => {
                       ))}
                     </SelectContent>
                   </Select>
-                  
+
                   {selectedAccount && (
                     <div className="mt-3 p-4 bg-muted/20 rounded-lg space-y-2 text-sm">
                       <div className="flex justify-between text-white">
                         <span>Total Balance:</span>
-                        <span className="font-mono">{formatBalance(balance, { decimals: 18, withUnit: 'tXOR' })}</span>
+                        <span className="font-mono">{formatBalance(balance, { decimals: 18, withUnit: 'tXOR', forceUnit: 'tXOR' })}</span>
                       </div>
                       <div className="flex justify-between text-white">
                         <span>Available:</span>
                         <span className="font-mono text-green-400">
-                          {formatBalance(getMaxTransferableAmount(), { decimals: 18, withUnit: 'tXOR' })}
+                          {formatBalance(getMaxTransferableAmount(), { decimals: 18, withUnit: 'tXOR', forceUnit: 'tXOR' })}
                         </span>
                       </div>
                       <div className="flex justify-between text-white">
                         <span>Locked:</span>
-                        <span className="font-mono text-orange-400">{formatBalance(lockedBalance, { decimals: 18, withUnit: 'tXOR' })}</span>
+                        <span className="font-mono text-orange-400">{formatBalance(lockedBalance, { decimals: 18, withUnit: 'tXOR', forceUnit: 'tXOR' })}</span>
                       </div>
                     </div>
                   )}
@@ -643,19 +643,19 @@ const TransferFunds = () => {
                       Max
                     </Button>
                   </div>
-                  
+
                   <div className="mt-2 space-y-1">
                     <div className="text-sm text-muted-foreground">
-                      Available: {formatBalance(getMaxTransferableAmount(), { decimals: 18, withUnit: 'tXOR' })}
+                      Available: {formatBalance(getMaxTransferableAmount(), { decimals: 18, withUnit: 'tXOR', forceUnit: 'tXOR'})}
                     </div>
-                    
+
                     {amountValidation && !amountValidation.isValid && (
                       <div className="text-sm text-red-500 flex items-center">
                         <FaTimesCircle className="w-3 h-3 mr-1" />
                         {amountValidation.error}
                       </div>
                     )}
-                    
+
                     {amountValidation && amountValidation.isValid && amount && (
                       <div className="text-sm text-green-500 flex items-center">
                         <FaCheckCircle className="w-3 h-3 mr-1" />
@@ -666,8 +666,8 @@ const TransferFunds = () => {
                 </div>
 
                 {/* Transfer Button */}
-                <Button 
-                  onClick={handleTransfer} 
+                <Button
+                  onClick={handleTransfer}
                   disabled={loading || !amount || !recipient || !validateAddress(recipient) || !selectedAccount || (amountValidation && !amountValidation.isValid)}
                   className="w-full"
                   size="lg"
@@ -767,7 +767,7 @@ const TransferFunds = () => {
                 <div className="flex justify-between text-sm">
                   <span className="text-white">Min. Balance:</span>
                   <span className="font-medium text-white">
-                    {formatBalance(XORION_CHAIN_CONFIG.existentialDeposit, { decimals: 18, withUnit: 'tXOR' })}
+                    {formatBalance(XORION_CHAIN_CONFIG.existentialDeposit, { decimals: 18, withUnit: 'tXOR',forceUnit: 'tXOR' })}
                   </span>
                 </div>
               </CardContent>
