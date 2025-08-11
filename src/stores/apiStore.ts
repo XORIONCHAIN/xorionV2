@@ -34,7 +34,7 @@ interface ApiStore {
 
 // WEBSOCKET ENDPOINTS
 const ENDPOINTS = [
-  "ws://3.219.48.230:9944"
+  "wss://node01.xorion.network"
 ];
 
 // CONNECTION CONSTANTS
