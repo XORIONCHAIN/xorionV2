@@ -1,7 +1,7 @@
 // fetchTxInfo.js
 import { ApiPromise, WsProvider } from '@polkadot/api';
 
-const WS_ENDPOINT = 'ws://3.219.48.230:9944';
+const WS_ENDPOINT = 'wss://node01.xorion.network';
 const TX_HASH = '0x685c5447be367905d849e4ed31eee346c7beb6ce166e3fd99973864f7510a8ad';
 
 async function main() {
