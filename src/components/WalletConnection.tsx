@@ -8,6 +8,12 @@ import { usePolkadotStore } from '@/stores/polkadotStore';
 import { web3Accounts, web3Enable } from '@polkadot/extension-dapp';
 import { InjectedAccountWithMeta } from '@polkadot/extension-inject/types';
 
+declare global {
+  interface Window {
+    injectedWeb3?: any; // Use 'any' if the exact type is unknown, or a more specific type if available.
+  }
+}
+
 const WALLET_ICONS: Record<string, JSX.Element> = {
   'polkadot-js': <FaWallet className="w-5 h-5" />,
   'talisman': <FaGhost className="w-5 h-5" />,
@@ -34,13 +40,13 @@ class WalletCache {
 
   private initialize() {
     if (this.initialized || typeof window === 'undefined') return;
-    
+
     // Check synchronously for immediate results
     POPULAR_WALLETS.forEach(wallet => {
       const isInstalled = !!(window as any).injectedWeb3?.[wallet.name];
       this.cache.set(wallet.name, isInstalled);
     });
-    
+
     this.initialized = true;
     this.notifyObservers();
   }
@@ -200,7 +206,7 @@ const WalletConnection = () => {
         const installed = POPULAR_WALLETS
           .filter(wallet => installedNames.includes(wallet.name))
           .map(wallet => ({ ...wallet, installed: true }));
-        
+
         setInstalledWallets(installed);
       };
 
@@ -221,11 +227,17 @@ const WalletConnection = () => {
 
   // Optimized reconnection logic
   useEffect(() => {
+    console.log('API State:', apiState.status);
+    console.log('Reconnection attempted:', reconnectionAttemptedRef.current);
+    console.log('Saved connection:', loadWalletConnection());
+    
     if (reconnectionAttemptedRef.current || apiState.status !== 'connected') return;
 
     const reconnectWallet = async () => {
       reconnectionAttemptedRef.current = true;
+      console.log('Attempting reconnect...');
       const savedConnection = loadWalletConnection();
+      console.log('Saved connection:', savedConnection);
       if (!savedConnection) return;
 
       const { walletName, accountAddress, accountSource } = savedConnection;
@@ -285,6 +297,53 @@ const WalletConnection = () => {
     reconnectWallet();
   }, [apiState.status, setSelectedWallet, setSelectedAccount, toast]);
 
+  useEffect(() => {
+    let timeoutId: NodeJS.Timeout;
+    let attempts = 0;
+    const maxAttempts = 20; // Stop after 10 seconds (20 * 500ms)
+
+    const checkWalletReady = () => {
+      attempts++;
+
+      // Check if any wallet extensions are available
+      const hasAnyWallet = POPULAR_WALLETS.some(wallet =>
+        window.injectedWeb3?.[wallet.name]
+      );
+
+      if (hasAnyWallet) {
+        // Refresh the wallet cache when wallets become available
+        walletCache.refresh();
+        console.log('Wallet extensions detected and cache refreshed');
+        return; // Stop checking
+      }
+
+      // Continue checking if we haven't exceeded max attempts
+      if (attempts < maxAttempts) {
+        timeoutId = setTimeout(checkWalletReady, 500);
+      } else {
+        console.log('Stopped checking for wallets after', maxAttempts, 'attempts');
+      }
+    };
+
+    // Only start checking if we're in the browser and no wallets are initially detected
+    if (typeof window !== 'undefined') {
+      const hasWallets = POPULAR_WALLETS.some(wallet =>
+        window.injectedWeb3?.[wallet.name]
+      );
+
+      if (!hasWallets) {
+        checkWalletReady();
+      }
+    }
+
+    // Cleanup timeout on unmount
+    return () => {
+      if (timeoutId) {
+        clearTimeout(timeoutId);
+      }
+    };
+  }, []);
+
   // Ultra-optimized account fetching
   useEffect(() => {
     if (step === 'accounts' && selectedWallet) {
@@ -335,7 +394,7 @@ const WalletConnection = () => {
 
   // Optimized balance fetching with caching
   const balanceCache = useRef<Map<string, { balance: string; timestamp: number }>>(new Map());
-  
+
   useEffect(() => {
     if (api && apiState.status === 'connected' && selectedAccount && modalOpen) {
       // Check cache first (5 second cache)
@@ -382,7 +441,7 @@ const WalletConnection = () => {
   const handleWalletSelect = useCallback(async (wallet: any) => {
     setSelectedWallet(wallet);
     setStep('accounts');
-    
+
     // Pre-fetch accounts immediately to reduce perceived delay
     setLoading(true);
     try {
@@ -391,7 +450,7 @@ const WalletConnection = () => {
         web3Accounts({ extensions: [wallet.name] }),
         new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout')), 1500))
       ]) as InjectedAccountWithMeta[];
-      
+
       setAccounts(accounts);
     } catch (error) {
       console.warn('Pre-fetch accounts failed:', error);
