@@ -561,17 +561,17 @@ const TransferFunds = () => {
                     <div className="mt-3 p-4 bg-muted/20 rounded-lg space-y-2 text-sm">
                       <div className="flex justify-between text-white">
                         <span>Total Balance:</span>
-                        <span className="font-mono">{formatBalance(balance, { decimals: 18, withUnit: 'tXOR', forceUnit: 'tXOR' })}</span>
+                        <span className="font-mono">{formatBalance(balance, { decimals: 18, withUnit: 'tXOR', })}</span>
                       </div>
                       <div className="flex justify-between text-white">
                         <span>Available:</span>
                         <span className="font-mono text-green-400">
-                          {formatBalance(getMaxTransferableAmount(), { decimals: 18, withUnit: 'tXOR', forceUnit: 'tXOR' })}
+                          {formatBalance(getMaxTransferableAmount(), { decimals: 18, withUnit: 'tXOR', })}
                         </span>
                       </div>
                       <div className="flex justify-between text-white">
                         <span>Locked:</span>
-                        <span className="font-mono text-orange-400">{formatBalance(lockedBalance, { decimals: 18, withUnit: 'tXOR', forceUnit: 'tXOR' })}</span>
+                        <span className="font-mono text-orange-400">{formatBalance(lockedBalance, { decimals: 18, withUnit: 'tXOR', })}</span>
                       </div>
                     </div>
                   )}
@@ -646,7 +646,7 @@ const TransferFunds = () => {
 
                   <div className="mt-2 space-y-1">
                     <div className="text-sm text-muted-foreground">
-                      Available: {formatBalance(getMaxTransferableAmount(), { decimals: 18, withUnit: 'tXOR', forceUnit: 'tXOR'})}
+                      Available: {formatBalance(getMaxTransferableAmount(), { decimals: 18, withUnit: 'tXOR', })}
                     </div>
 
                     {amountValidation && !amountValidation.isValid && (
@@ -767,7 +767,7 @@ const TransferFunds = () => {
                 <div className="flex justify-between text-sm">
                   <span className="text-white">Min. Balance:</span>
                   <span className="font-medium text-white">
-                    {formatBalance(XORION_CHAIN_CONFIG.existentialDeposit, { decimals: 18, withUnit: 'tXOR',forceUnit: 'tXOR' })}
+                    {formatBalance(XORION_CHAIN_CONFIG.existentialDeposit, { decimals: 18, withUnit: 'tXOR'})}
                   </span>
                 </div>
               </CardContent>
