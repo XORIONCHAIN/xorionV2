@@ -23,7 +23,7 @@ const tasks = [
   {
     id: "follow-x",
     label: "Follow us on X (Twitter)",
-    description: "Get updates and earn 10 points for following @xorionchain.",
+    description: "Get updates and earn 100 points for following @xorionchain.",
     icon: FaTwitter,
     link: "https://x.com/xorionchain",
     points: 100,
@@ -34,7 +34,7 @@ const tasks = [
   {
     id: "follow-huostarter",
     label: "Follow Huostarter on (Twitter)",
-    description: "Get updates and earn 10 points for following @huostarter.",
+    description: "Get updates and earn 100 points for following @huostarter.",
     icon: FaTwitter,
     link: "https://x.com/Huostarter",
     points: 100,
