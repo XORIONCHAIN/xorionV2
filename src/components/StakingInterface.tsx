@@ -13,6 +13,7 @@ import AccountSelector from './AccountSelector';
 import StakingOverview from './StakingOverview';
 import StakingActions from './StakingActions';
 import DelegationDistributionChart from './DelegationDistributionChart';
+import { LockIcon, CircleDashedIcon, ListIcon, CircleIcon, CalendarIcon, LockOpenIcon } from 'lucide-react';
 
 // Types
 interface Validator {
@@ -33,6 +34,8 @@ interface UserStakingInfo {
     amount: string;
     rewards: string;
   }>;
+  unbonding: Array<{ value: string; era: number }>;
+  totalUnbonding: string;
 }
 
 // Fixed balance utilities - Using 18 decimals for XOR
@@ -117,6 +120,8 @@ const StakingInterface = () => {
     totalRewards: "0",
     pendingRewards: "0",
     delegations: [],
+    unbonding: [],
+    totalUnbonding: "0",
   });
 
   // UI State - Direct Staking
@@ -299,26 +304,17 @@ const StakingInterface = () => {
       let totalStaked = "0";
       let isAccountBonded = false;
       let controller = null;
+      let unbonding: Array<{ value: string; era: number }> = [];
+      let totalUnbonding = new BN(0);
 
       console.log('Bonded result:', bondedResult.toHuman?.());
 
-      // Handle bonded result
       if (bondedResult && !bondedResult.isEmpty) {
-        const bondedJson = bondedResult.toJSON();
-        console.log('Bonded JSON:', bondedJson);
-
-        if (typeof bondedJson === 'string' && bondedJson) {
-          isAccountBonded = true;
-          controller = bondedJson;
-        } else if (bondedJson && typeof bondedJson === 'object' && bondedJson !== null) {
-          isAccountBonded = true;
-          controller = bondedJson.toString();
-        }
+        isAccountBonded = true;
+        controller = bondedResult.toJSON();
+        console.log('Bonded JSON:', controller);
       }
 
-      console.log('Is bonded:', isAccountBonded, 'Controller:', controller);
-
-      // Get staking ledger if bonded
       if (controller) {
         try {
           const ledgerResult = await api.query.staking.ledger(controller);
@@ -326,14 +322,20 @@ const StakingInterface = () => {
 
           if (ledgerResult && !ledgerResult.isEmpty) {
             const ledger = ledgerResult.unwrap();
-            const rawActiveBalance = ledger.active.toString();
+            totalStaked = ledger.active.toString();
+            unbonding = ledger.unlocking.map((chunk: any) => ({
+              value: chunk.value.toString(),
+              era: Number(chunk.era.toString()),
+            }));
 
-            console.log('Total staked from ledger (raw):', rawActiveBalance);
-            console.log('Total staked from ledger (hex):', ledger.active.toHex?.());
+            // Calculate total unbonding amount
+            totalUnbonding = unbonding.reduce(
+              (sum, chunk) => sum.add(new BN(chunk.value)),
+              new BN(0)
+            );
 
-            // **THIS IS THE FIX** - Use raw value for totalStaked
-            totalStaked = rawActiveBalance;
-            console.log('Total staked (raw):', totalStaked);
+            console.log('Unbonding chunks:', unbonding);
+            console.log('Total unbonding (raw):', totalUnbonding.toString());
           }
         } catch (error) {
           console.error('Error fetching ledger:', error);
@@ -353,7 +355,7 @@ const StakingInterface = () => {
         if (targets && targets.length > 0) {
           delegations = targets.map((validator: any) => ({
             validator: validator.toString(),
-            amount: totalStaked, // Use the formatted amount
+            amount: totalStaked,
             rewards: "0",
           }));
           console.log('Found delegations:', delegations.length);
@@ -366,17 +368,20 @@ const StakingInterface = () => {
         totalRewards: "0",
         pendingRewards: "0",
         delegations,
+        unbonding,
+        totalUnbonding: totalUnbonding.toString(),
       });
       setIsBonded(isAccountBonded);
       setIsInitialLoad(false);
 
       console.log('Final staking state:', {
         totalStaked,
+        totalUnbonding: totalUnbonding.toString(),
+        unbonding,
         delegations: delegations.length,
-        isBonded: isAccountBonded
+        isBonded: isAccountBonded,
       });
       console.log('=== END STAKING DEBUG ===');
-
     } catch (error: any) {
       console.error('Error fetching user staking:', error);
       setStakingError(error.message || 'Failed to fetch staking data');
@@ -385,6 +390,8 @@ const StakingInterface = () => {
         totalRewards: "0",
         pendingRewards: "0",
         delegations: [],
+        unbonding: [],
+        totalUnbonding: "0",
       });
       setIsBonded(false);
       setIsInitialLoad(false);
@@ -402,6 +409,75 @@ const StakingInterface = () => {
   useEffect(() => {
     fetchBalance();
   }, [fetchBalance]);
+
+  const UnbondingSection = () => {
+    return (
+      <Card className="mt-6 bg-card/50 backdrop-blur-sm text-white p-6 rounded-lg shadow-lg border border-white/10">
+        <CardHeader className="pb-4">
+          <div className="flex items-center space-x-3">
+            <LockIcon className="h-6 w-6 text-blue-400" />
+            <CardTitle className="text-xl font-semibold">Unbonding Funds</CardTitle>
+          </div>
+        </CardHeader>
+
+        <CardContent>
+          {userStaking.unbonding.length > 0 ? (
+            <div className="space-y-6">
+              <div className="bg-white/5 p-4 rounded-lg border border-white/5">
+                <div className="flex items-center space-x-2 text-blue-300">
+                  <CircleDashedIcon className="h-5 w-5" />
+                  <p className="text-lg font-medium">
+                    Total Unbonding:{" "}
+                    <span className="font-bold text-white">
+                      {formatBalanceForDisplay(userStaking.totalUnbonding, 18)} XOR
+                    </span>
+                  </p>
+                </div>
+              </div>
+
+              <div>
+                <div className="flex items-center space-x-2 mb-3 text-muted-foreground">
+                  <ListIcon className="h-5 w-5" />
+                  <h3 className="text-md font-medium">Unbonding Chunks</h3>
+                </div>
+
+                <div className="space-y-3">
+                  {userStaking.unbonding.map((chunk, index) => (
+                    <div
+                      key={index}
+                      className="flex justify-between items-center bg-white/5 p-3 rounded-lg border border-white/5 hover:bg-white/10 transition-colors"
+                    >
+                      <div className="flex items-center space-x-2">
+                        <CircleIcon className="h-4 w-4 text-blue-400" />
+                        <span className="font-medium">
+                          {formatBalanceForDisplay(chunk.value, 18)} XOR
+                        </span>
+                      </div>
+                      <div className="flex items-center space-x-2 text-sm text-muted-foreground">
+                        <CalendarIcon className="h-4 w-4" />
+                        <span>Unlocks at era {chunk.era}</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          ) : (
+            <div className="flex flex-col items-center justify-center py-8 text-center">
+              <LockOpenIcon className="h-10 w-10 text-muted-foreground mb-3" />
+              <p className="text-muted-foreground">No funds currently unbonding</p>
+              <p className="text-sm text-muted-foreground/70 mt-1">
+                Funds will appear here when unbonding
+              </p>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+    );
+  };
+
+
+
 
   // Helper function to execute transactions with proper error handling
   const executeTransaction = async (tx: any, successMessage: string, onSuccess?: () => void): Promise<boolean> => {
@@ -842,6 +918,7 @@ const StakingInterface = () => {
             erasPerDay: 1,
           }}
         />
+        <UnbondingSection />
 
         {/* Staking Actions */}
         <StakingActions
