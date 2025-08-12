@@ -26,7 +26,18 @@ const tasks = [
     description: "Get updates and earn 10 points for following @xorionchain.",
     icon: FaTwitter,
     link: "https://x.com/xorionchain",
-    points: 10,
+    points: 100,
+    handleLabel: "Twitter Username",
+    handlePlaceholder: "e.g., yourusername",
+    handleNote: "Don't include the @ symbol"
+  },
+  {
+    id: "follow-huostarter",
+    label: "Follow Huostarter on (Twitter)",
+    description: "Get updates and earn 10 points for following @huostarter.",
+    icon: FaTwitter,
+    link: "https://x.com/Huostarter",
+    points: 100,
     handleLabel: "Twitter Username",
     handlePlaceholder: "e.g., yourusername",
     handleNote: "Don't include the @ symbol"
@@ -70,10 +81,10 @@ export default function TasksPage() {
   const [completed, setCompleted] = useState<string[]>([])
   const [isVerifying, setIsVerifying] = useState<boolean>(false)
   const [error, setError] = useState<string | null>(null)
-  const [currentTask, setCurrentTask] = useState<{id: string, link: string, task: any} | null>(null)
+  const [currentTask, setCurrentTask] = useState<{ id: string, link: string, task: any } | null>(null)
   const [userHandle, setUserHandle] = useState<string>("")
   const [isModalOpen, setIsModalOpen] = useState<boolean>(false)
-  const {selectedAccount} = useWallet()
+  const { selectedAccount } = useWallet()
 
   const { isLoading } = useQuery({
     queryKey: ['completedTasks', selectedAccount?.address],
@@ -150,7 +161,7 @@ export default function TasksPage() {
       }
     } catch (err) {
       console.error("Task verification error:", err)
-      
+
       if (axios.isAxiosError(err)) {
         if (err.code === 'ECONNABORTED' || err.message === 'Network Error') {
           setError("Network error. Please check your connection and try again.")
@@ -246,17 +257,15 @@ export default function TasksPage() {
                 <CardContent className="p-4 sm:p-6">
                   <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 sm:gap-6">
                     <div className="flex items-center gap-3 sm:gap-4 w-full">
-                      <div className={`p-2 sm:p-3 rounded-xl ${
-                        task.id === 'follow-discord' 
-                          ? 'bg-gradient-to-r from-indigo-500/20 to-purple-500/20 border border-indigo-500/30' 
+                      <div className={`p-2 sm:p-3 rounded-xl ${task.id === 'follow-discord'
+                          ? 'bg-gradient-to-r from-indigo-500/20 to-purple-500/20 border border-indigo-500/30'
                           : task.id === 'join-telegram'
-                          ? 'bg-gradient-to-r from-cyan-500/20 to-blue-500/20 border border-cyan-500/30'
-                          : 'bg-gradient-to-r from-blue-500/20 to-purple-500/20 border border-blue-500/30'
-                      }`}>
-                        <task.icon className={`w-5 sm:w-6 h-5 sm:h-6 ${
-                          task.id === 'follow-discord' ? 'text-indigo-400' : 
-                          task.id === 'join-telegram' ? 'text-cyan-400' : 'text-blue-400'
-                        }`} />
+                            ? 'bg-gradient-to-r from-cyan-500/20 to-blue-500/20 border border-cyan-500/30'
+                            : 'bg-gradient-to-r from-blue-500/20 to-purple-500/20 border border-blue-500/30'
+                        }`}>
+                        <task.icon className={`w-5 sm:w-6 h-5 sm:h-6 ${task.id === 'follow-discord' ? 'text-indigo-400' :
+                            task.id === 'join-telegram' ? 'text-cyan-400' : 'text-blue-400'
+                          }`} />
                       </div>
                       <div className="flex-1">
                         <h3 className="font-semibold text-white text-base sm:text-lg mb-1 group-hover:text-blue-300 transition-colors">
@@ -339,11 +348,11 @@ export default function TasksPage() {
               Verify {currentTask?.task?.label || "Task"}
             </DialogTitle>
             <DialogDescription className="text-slate-400 text-sm sm:text-base">
-              {currentTask?.task?.id === 'follow-discord' 
+              {currentTask?.task?.id === 'follow-discord'
                 ? "Please enter your Discord username to verify you've joined our server."
-                : currentTask?.task?.id === 'join-telegram' || currentTask?.task?.id === 'join-telegram-channel' 
-                ? "Please enter your Telegram User ID (not username) to verify you've joined our group. You can find your User ID using @userinfobot on Telegram."
-                : "Please enter your Twitter (X) username to verify you've followed us."
+                : currentTask?.task?.id === 'join-telegram' || currentTask?.task?.id === 'join-telegram-channel'
+                  ? "Please enter your Telegram User ID (not username) to verify you've joined our group. You can find your User ID using @userinfobot on Telegram."
+                  : "Please enter your Twitter (X) username to verify you've followed us."
               }
             </DialogDescription>
           </DialogHeader>
