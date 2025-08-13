@@ -6,6 +6,7 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { Suspense, lazy } from "react";
 import { ThemeProvider } from "next-themes";
 import { WalletProvider } from "./components/WalletConnection";
+import BackToTop from "./components/BackToTop";
 
 const queryClient = new QueryClient();
 import CustomLoader from "./components/ui/CustomLoader";
@@ -40,6 +41,7 @@ const App = () => (
                 <Route path="/tasks/leaderboard" element={<LeaderboardPage />} />
                 <Route path="*" element={<NotFound />} />
               </Routes>
+              <BackToTop />
             </Suspense>
           </BrowserRouter>
         </WalletProvider>
