@@ -8,7 +8,6 @@ import { Button } from '@/components/ui/button';
 import { Menu } from 'lucide-react';
 import Footer from '@/components/Footer';
 import AirdropPanel from '@/components/AirdropPanel';
-import { Label } from 'recharts';
 import { GiTwoCoins } from "react-icons/gi"
 
 // LAZY LOADED COMPONENTS
@@ -32,11 +31,10 @@ const NavigationBar = ({ tabs, activeTab, setActiveTab }) => {
                 <button
                   key={tab.id}
                   onClick={() => setActiveTab(tab.id)}
-                  className={`flex items-center space-x-2 px-3 py-4 border-b-2 text-sm font-medium transition-colors ${
-                    activeTab === tab.id
+                  className={`flex items-center space-x-2 px-3 py-4 border-b-2 text-sm font-medium transition-colors ${activeTab === tab.id
                       ? 'border-transparent bg-gradient-to-r from-pink-400 to-purple-500 bg-clip-text text-transparent border-b-2 border-gradient-to-r from-pink-400 to-purple-500'
                       : 'border-transparent text-muted-foreground hover:text-foreground hover:border-border'
-                  }`}
+                    }`}
                 >
                   <IconComponent className="w-4 h-4  text-gradient-to-r from-pink-400 to-purple-500" />
                   <span>{tab.label}</span>
@@ -76,7 +74,7 @@ const NavigationBar = ({ tabs, activeTab, setActiveTab }) => {
                 <div className="flex items-center justify-between mb-6">
                   <h3 className="text-lg font-semibold text-foreground">Navigation</h3>
                 </div>
-                
+
                 <div className="space-y-2">
                   {tabs.map((tab) => {
                     const IconComponent = tab.icon;
@@ -87,11 +85,10 @@ const NavigationBar = ({ tabs, activeTab, setActiveTab }) => {
                           setActiveTab(tab.id);
                           setMobileMenuOpen(false);
                         }}
-                        className={`w-full flex items-center space-x-3 px-4 py-3 rounded-lg text-left transition-colors ${
-                          activeTab === tab.id
+                        className={`w-full flex items-center space-x-3 px-4 py-3 rounded-lg text-left transition-colors ${activeTab === tab.id
                             ? 'bg-primary/10 text-primary border border-primary/30'
                             : 'text-foreground hover:bg-muted'
-                        }`}
+                          }`}
                       >
                         <IconComponent className="w-5 h-5" />
                         <span className="font-medium">{tab.label}</span>
@@ -131,7 +128,7 @@ const Index = () => {
     { id: 'validators', label: 'Validators', icon: FaUsers },
     { id: 'transactions', label: 'Transactions', icon: FaBolt },
     { id: 'transfer', label: 'Transfer', icon: FaPaperPlane },
-    {id:'airdrop', label:'Airdrop' ,icon:GiTwoCoins }
+    { id: 'airdrop', label: 'Airdrop', icon: GiTwoCoins }
   ];
 
   const renderContent = () => {
@@ -175,7 +172,7 @@ const Index = () => {
 
   return (
     <div className="min-h-screen bg-background">
-       <div className="fixed inset-0 pointer-events-none">
+      <div className="fixed inset-0 pointer-events-none">
         <div className="floating-bg absolute top-20 left-10 w-48 h-48 md:w-96 md:h-96 bg-gradient-to-r from-blue-500/20 to-purple-500/20 rounded-full blur-3xl"></div>
         <div className="floating-bg absolute bottom-20 right-10 w-40 h-40 md:w-80 md:h-80 bg-gradient-to-r from-pink-500/20 to-red-500/20 rounded-full blur-3xl"></div>
         <div className="floating-bg absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-32 h-32 md:w-64 md:h-64 bg-gradient-to-r from-green-500/20 to-cyan-500/20 rounded-full blur-3xl"></div>

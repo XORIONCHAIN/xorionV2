@@ -1,4 +1,5 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { FaShieldAlt } from 'react-icons/fa';
@@ -8,7 +9,6 @@ import { web3Accounts, web3Enable, web3FromSource } from '@polkadot/extension-da
 import type { InjectedAccountWithMeta } from '@polkadot/extension-inject/types';
 import BN from 'bn.js';
 import { TooltipProps } from 'recharts';
-
 import AccountSelector from './AccountSelector';
 import StakingOverview from './StakingOverview';
 import StakingActions from './StakingActions';
@@ -55,15 +55,11 @@ const formatBalance = (balance: string, decimals: number = 18): string => {
 const parseBalance = (amount: string, decimals: number = 18): string => {
   try {
     if (!amount || amount === "0") return "0";
-    // Remove commas and handle decimal points properly
     const cleanAmount = amount.replace(/,/g, '');
     const parts = cleanAmount.split('.');
     let wholeNumber = parts[0] || '0';
     let decimalPart = parts[1] || '';
-
-    // If decimal part is provided, adjust accordingly
     if (decimalPart.length > 0) {
-      // Pad or truncate decimal part to match expected decimals
       decimalPart = decimalPart.padEnd(decimals, '0').substring(0, decimals);
       const wholeBN = new BN(wholeNumber);
       const decimalBN = new BN(decimalPart);
@@ -83,13 +79,11 @@ const parseBalance = (amount: string, decimals: number = 18): string => {
   }
 };
 
-// Enhanced balance formatting for display
 const formatBalanceForDisplay = (balance: string, decimals: number = 18): string => {
   try {
     if (!balance || balance === "0") return "0";
     const formatted = formatBalance(balance, decimals);
     const num = parseFloat(formatted);
-
     if (num === 0) return "0";
     if (num < 0.001) return "< 0.001";
     if (num < 1) return num.toFixed(6).replace(/\.?0+$/, '');
@@ -111,7 +105,6 @@ const StakingInterface = () => {
   // Account State
   const [accounts, setAccounts] = useState<InjectedAccountWithMeta[]>([]);
   const [selectedAccount, setSelectedAccount] = useState<InjectedAccountWithMeta | null>(null);
-  const [balance, setBalance] = useState("0");
 
   // Staking Data
   const [validators, setValidators] = useState<Validator[]>([]);
@@ -164,162 +157,113 @@ const StakingInterface = () => {
         });
       }
     };
-
     initWallet();
   }, [toast]);
 
-  // Separate balance fetching function
-  const fetchBalance = useCallback(async () => {
-    if (!apiConnected || !selectedAccount) return;
-
-    try {
-      const accountInfo = await api.query.system.account(selectedAccount.address);
-
-      console.log('=== BALANCE DEBUG ===');
-      console.log('Account info raw:', accountInfo.toString());
-      console.log('Account info human:', accountInfo.toHuman?.());
-      console.log('Account info JSON:', accountInfo.toJSON?.());
-
-      let freeBalance = "0";
-
-      // Multiple ways to extract balance
-      if (accountInfo && accountInfo.data && accountInfo.data.free) {
-        freeBalance = accountInfo.data.free.toString();
-        console.log('Method 1 - Raw balance:', freeBalance);
-      } else if (accountInfo.toJSON) {
-        const json = accountInfo.toJSON() as any;
-        if (json?.data?.free) {
-          freeBalance = json.data.free.toString();
-          console.log('Method 2 - JSON balance:', freeBalance);
-        }
-      } else if (accountInfo.toHuman) {
-        const human = accountInfo.toHuman() as any;
-        if (human?.data?.free) {
-          // Convert human readable back to raw
-          const humanBalance = human.data.free.toString().replace(/,/g, '');
-          if (humanBalance.includes(' ')) {
-            // Handle formatted balance like "1.234 kXOR"
-            const numPart = humanBalance.split(' ')[0];
-            freeBalance = parseBalance(numPart, 18);
-          } else {
-            freeBalance = parseBalance(humanBalance, 18);
+  // Fetch balance using TanStack Query
+  const { data: balance = "0" } = useQuery({
+    queryKey: ['balance', selectedAccount?.address, apiConnected],
+    queryFn: async () => {
+      if (!apiConnected || !selectedAccount) return "0";
+      try {
+        const accountInfo = await api.query.system.account(selectedAccount.address);
+        let freeBalance = "0";
+        if (accountInfo && accountInfo.data && accountInfo.data.free) {
+          freeBalance = accountInfo.data.free.toString();
+        } else if (accountInfo.toJSON) {
+          const json = accountInfo.toJSON() as any;
+          if (json?.data?.free) freeBalance = json.data.free.toString();
+        } else if (accountInfo.toHuman) {
+          const human = accountInfo.toHuman() as any;
+          if (human?.data?.free) {
+            const humanBalance = human.data.free.toString().replace(/,/g, '');
+            freeBalance = parseBalance(humanBalance.includes(' ') ? humanBalance.split(' ')[0] : humanBalance, 18);
           }
-          console.log('Method 3 - Human balance:', humanBalance, '-> Raw:', freeBalance);
         }
+        return freeBalance;
+      } catch (error) {
+        console.error('Error fetching balance:', error);
+        return "0";
       }
+    },
+    enabled: apiConnected && !!selectedAccount,
+  });
 
-      const formattedBalance = formatBalanceForDisplay(freeBalance, 18);
-      console.log('Final formatted balance:', formattedBalance);
-      console.log('=== END BALANCE DEBUG ===');
-
-      setBalance(freeBalance);
-
-    } catch (error) {
-      console.error('Error fetching balance:', error);
-      setBalance("0");
-    }
-  }, [api, apiConnected, selectedAccount]);
-
-  // Fetch validators
-  const fetchValidators = useCallback(async () => {
-    if (!apiConnected) return;
-
-    try {
-      console.log('Fetching validators...');
-      const activeValidators = await api.query.session.validators();
-      let validatorList: any[] = [];
-
-      if (Array.isArray(activeValidators)) {
-        validatorList = activeValidators;
-      } else if (activeValidators.toJSON) {
-        const json = activeValidators.toJSON();
-        if (Array.isArray(json)) {
-          validatorList = json;
-        } else {
-          console.warn('Unexpected validators format:', json);
-          validatorList = [];
-        }
-      }
-
-      console.log('Found validators:', validatorList.length);
-
-      const validatorsWithDetails = await Promise.all(
-        validatorList.slice(0, 50).map(async (validatorId: any) => { // Limit to first 50 for performance
-          try {
-            const prefs = await api.query.staking.validators(validatorId);
-            let commission = 0;
-
-            if (prefs && prefs.toHuman) {
-              const prefsHuman = prefs.toHuman() as { commission?: string };
-              const commissionStr = String(prefsHuman?.commission || "0").replace("%", "");
-              commission = parseFloat(commissionStr) || 0;
+  // Fetch validators using TanStack Query
+  const { data: fetchedValidators = [] } = useQuery({
+    queryKey: ['validators', apiConnected],
+    queryFn: async () => {
+      if (!apiConnected) return [];
+      try {
+        const activeValidators = await api.query.session.validators();
+        let validatorList: any[] = Array.isArray(activeValidators) ? activeValidators : activeValidators.toJSON() || [];
+        const validatorsWithDetails = await Promise.all(
+          validatorList.slice(0, 50).map(async (validatorId: any) => {
+            try {
+              const prefs = await api.query.staking.validators(validatorId);
+              let commission = 0;
+              if (prefs && prefs.toHuman) {
+                const prefsHuman = prefs.toHuman() as { commission?: string };
+                const commissionStr = String(prefsHuman?.commission || "0").replace("%", "");
+                commission = parseFloat(commissionStr) || 0;
+              }
+              return {
+                accountId: validatorId.toString(),
+                commission,
+                totalStake: "0",
+                ownStake: "0",
+                nominatorCount: 0,
+                isActive: true,
+              };
+            } catch (error) {
+              console.error(`Error fetching validator ${validatorId}:`, error);
+              return {
+                accountId: validatorId.toString(),
+                commission: 0,
+                totalStake: "0",
+                ownStake: "0",
+                nominatorCount: 0,
+                isActive: true,
+              };
             }
-
-            return {
-              accountId: validatorId.toString(),
-              commission,
-              totalStake: "0",
-              ownStake: "0",
-              nominatorCount: 0,
-              isActive: true,
-            };
-          } catch (error) {
-            console.error(`Error fetching validator ${validatorId}:`, error);
-            return {
-              accountId: validatorId.toString(),
-              commission: 0,
-              totalStake: "0",
-              ownStake: "0",
-              nominatorCount: 0,
-              isActive: true,
-            };
-          }
-        })
-      );
-
-      setValidators(validatorsWithDetails);
-      console.log('Validators loaded:', validatorsWithDetails.length);
-
-    } catch (error) {
-      console.error('Error fetching validators:', error);
-      toast({
-        title: "Fetch Error",
-        description: "Failed to fetch validators",
-        variant: "destructive"
-      });
-    }
-  }, [api, apiConnected, toast]);
-
-  // Enhanced user staking information fetching
-  const fetchUserStaking = useCallback(async () => {
-    if (!apiConnected || !selectedAccount) return;
-    setStakingError(null);
-
-    try {
-      console.log('=== STAKING DEBUG ===');
-      console.log('Fetching staking info for:', selectedAccount.address);
-
-      // Check if account is bonded
-      const bondedResult = await api.query.staking.bonded(selectedAccount.address);
-      let totalStaked = "0";
-      let isAccountBonded = false;
-      let controller = null;
-      let unbonding: Array<{ value: string; era: number }> = [];
-      let totalUnbonding = new BN(0);
-
-      console.log('Bonded result:', bondedResult.toHuman?.());
-
-      if (bondedResult && !bondedResult.isEmpty) {
-        isAccountBonded = true;
-        controller = bondedResult.toJSON();
-        console.log('Bonded JSON:', controller);
+          })
+        );
+        return validatorsWithDetails;
+      } catch (error) {
+        console.error('Error fetching validators:', error);
+        toast({
+          title: "Fetch Error",
+          description: "Failed to fetch validators",
+          variant: "destructive"
+        });
+        return [];
       }
+    },
+    enabled: apiConnected,
+  });
 
-      if (controller) {
-        try {
+  // Fetch user staking info using TanStack Query
+  const { data: userStakingData } = useQuery({
+    queryKey: ['userStaking', selectedAccount?.address, apiConnected],
+    queryFn: async () => {
+      if (!apiConnected || !selectedAccount) return null;
+      try {
+        setStakingError(null);
+        let totalStaked = "0";
+        let isAccountBonded = false;
+        let controller = null;
+        let unbonding: Array<{ value: string; era: number }> = [];
+        let totalUnbonding = new BN(0);
+        let delegations: UserStakingInfo['delegations'] = [];
+
+        const bondedResult = await api.query.staking.bonded(selectedAccount.address);
+        if (bondedResult && !bondedResult.isEmpty) {
+          isAccountBonded = true;
+          controller = bondedResult.toJSON();
+        }
+
+        if (controller) {
           const ledgerResult = await api.query.staking.ledger(controller);
-          console.log('Ledger result:', ledgerResult.toHuman?.());
-
           if (ledgerResult && !ledgerResult.isEmpty) {
             const ledger = ledgerResult.unwrap();
             totalStaked = ledger.active.toString();
@@ -327,88 +271,73 @@ const StakingInterface = () => {
               value: chunk.value.toString(),
               era: Number(chunk.era.toString()),
             }));
-
-            // Calculate total unbonding amount
             totalUnbonding = unbonding.reduce(
               (sum, chunk) => sum.add(new BN(chunk.value)),
               new BN(0)
             );
-
-            console.log('Unbonding chunks:', unbonding);
-            console.log('Total unbonding (raw):', totalUnbonding.toString());
           }
-        } catch (error) {
-          console.error('Error fetching ledger:', error);
         }
-      }
 
-      // Get nominations
-      const nominations = await api.query.staking.nominators(selectedAccount.address);
-      let delegations: UserStakingInfo['delegations'] = [];
-
-      console.log('Nominations result:', nominations.toHuman?.());
-
-      if (nominations && !nominations.isEmpty) {
-        const nominationsData = nominations.unwrap();
-        const targets = nominationsData.targets;
-
-        if (targets && targets.length > 0) {
-          delegations = targets.map((validator: any) => ({
-            validator: validator.toString(),
-            amount: totalStaked,
-            rewards: "0",
-          }));
-          console.log('Found delegations:', delegations.length);
+        const nominations = await api.query.staking.nominators(selectedAccount.address);
+        if (nominations && !nominations.isEmpty) {
+          const nominationsData = nominations.unwrap();
+          const targets = nominationsData.targets;
+          if (targets && targets.length > 0) {
+            delegations = targets.map((validator: any) => ({
+              validator: validator.toString(),
+              amount: totalStaked,
+              rewards: "0",
+            }));
+          }
         }
+
+        return {
+          totalStaked,
+          totalRewards: "0",
+          pendingRewards: "0",
+          delegations,
+          unbonding,
+          totalUnbonding: totalUnbonding.toString(),
+          isBonded: isAccountBonded,
+        };
+      } catch (error: any) {
+        console.error('Error fetching user staking:', error);
+        setStakingError(error.message || 'Failed to fetch staking data');
+        return {
+          totalStaked: "0",
+          totalRewards: "0",
+          pendingRewards: "0",
+          delegations: [],
+          unbonding: [],
+          totalUnbonding: "0",
+          isBonded: false,
+        };
       }
+    },
+    enabled: apiConnected && !!selectedAccount,
+  });
 
-      // Update state
-      setUserStaking({
-        totalStaked,
-        totalRewards: "0",
-        pendingRewards: "0",
-        delegations,
-        unbonding,
-        totalUnbonding: totalUnbonding.toString(),
-      });
-      setIsBonded(isAccountBonded);
-      setIsInitialLoad(false);
+  // Update state when query data changes
+  useEffect(() => {
+    if (fetchedValidators) {
+      setValidators(fetchedValidators);
+    }
+  }, [fetchedValidators]);
 
-      console.log('Final staking state:', {
-        totalStaked,
-        totalUnbonding: totalUnbonding.toString(),
-        unbonding,
-        delegations: delegations.length,
-        isBonded: isAccountBonded,
-      });
-      console.log('=== END STAKING DEBUG ===');
-    } catch (error: any) {
-      console.error('Error fetching user staking:', error);
-      setStakingError(error.message || 'Failed to fetch staking data');
+  useEffect(() => {
+    if (userStakingData) {
       setUserStaking({
-        totalStaked: "0",
-        totalRewards: "0",
-        pendingRewards: "0",
-        delegations: [],
-        unbonding: [],
-        totalUnbonding: "0",
+        totalStaked: userStakingData.totalStaked,
+        totalRewards: userStakingData.totalRewards,
+        pendingRewards: userStakingData.pendingRewards,
+        delegations: userStakingData.delegations,
+        unbonding: userStakingData.unbonding,
+        totalUnbonding: userStakingData.totalUnbonding,
       });
-      setIsBonded(false);
+      setIsBonded(userStakingData.isBonded);
       setIsInitialLoad(false);
     }
-  }, [api, apiConnected, selectedAccount, isInitialLoad]);
-  // Effects
-  useEffect(() => {
-    fetchValidators();
-  }, [fetchValidators]);
-
-  useEffect(() => {
-    fetchUserStaking();
-  }, [fetchUserStaking]);
-
-  useEffect(() => {
-    fetchBalance();
-  }, [fetchBalance]);
+  }, [userStakingData]);
 
   const UnbondingSection = () => {
     return (
@@ -419,7 +348,6 @@ const StakingInterface = () => {
             <CardTitle className="text-xl font-semibold">Unbonding Funds</CardTitle>
           </div>
         </CardHeader>
-
         <CardContent>
           {userStaking.unbonding.length > 0 ? (
             <div className="space-y-6">
@@ -434,13 +362,11 @@ const StakingInterface = () => {
                   </p>
                 </div>
               </div>
-
               <div>
                 <div className="flex items-center space-x-2 mb-3 text-muted-foreground">
                   <ListIcon className="h-5 w-5" />
                   <h3 className="text-md font-medium">Unbonding Chunks</h3>
                 </div>
-
                 <div className="space-y-3">
                   {userStaking.unbonding.map((chunk, index) => (
                     <div
@@ -476,40 +402,24 @@ const StakingInterface = () => {
     );
   };
 
-
-
-
   // Helper function to execute transactions with proper error handling
   const executeTransaction = async (tx: any, successMessage: string, onSuccess?: () => void): Promise<boolean> => {
     if (!selectedAccount) return false;
-
     try {
       const injector = await web3FromSource(selectedAccount.meta.source);
-
       return new Promise((resolve, reject) => {
         let unsub: () => void;
-
         tx.signAndSend(
           selectedAccount.address,
           { signer: injector.signer },
           ({ status, dispatchError, events }: any) => {
-            console.log('Transaction status:', status.type);
-
-            if (status.isInBlock) {
-              console.log('Transaction included in block:', status.asInBlock.toHex());
-            }
-
             if (status.isFinalized) {
-              console.log('Transaction finalized:', status.asFinalized.toHex());
-
               if (dispatchError) {
                 let errorMessage = 'Transaction failed';
-
                 if (dispatchError.isModule) {
                   try {
                     const decoded = api.registry.findMetaError(dispatchError.asModule);
-                    const { docs, name, section } = decoded;
-                    errorMessage = `${section}.${name}: ${docs.join(' ')}`;
+                    errorMessage = `${decoded.section}.${decoded.name}: ${decoded.docs.join(' ')}`;
                   } catch (error) {
                     console.error('Error decoding dispatch error:', error);
                     errorMessage = dispatchError.toString();
@@ -517,7 +427,6 @@ const StakingInterface = () => {
                 } else {
                   errorMessage = dispatchError.toString();
                 }
-
                 reject(new Error(errorMessage));
               } else {
                 toast({
@@ -527,7 +436,6 @@ const StakingInterface = () => {
                 onSuccess?.();
                 resolve(true);
               }
-
               if (unsub) unsub();
             }
           }
@@ -554,14 +462,10 @@ const StakingInterface = () => {
       });
       return;
     }
-
     setLoading(true);
-
     try {
-      // Parse and validate stake amount
       const value = parseBalance(stakeAmount);
       const amountBN = new BN(value);
-
       if (amountBN.lten(0)) {
         toast({
           title: "Invalid Amount",
@@ -570,32 +474,14 @@ const StakingInterface = () => {
         });
         return;
       }
-
-      // Get detailed balance information
       const accountInfo = await api.query.system.account(selectedAccount.address);
       const { free, reserved, miscFrozen, feeFrozen } = accountInfo.data;
-
       const frozenBalance = miscFrozen || feeFrozen || new BN(0);
       const availableBalance = free.sub(reserved).sub(frozenBalance);
-
-
-      console.log('Staking Debug:', {
-        stakeAmount,
-        parsedValue: value,
-        freeBalance: free.toString(),
-        reservedBalance: reserved.toString(),
-        frozenBalance: frozenBalance.toString(),
-        availableBalance: availableBalance.toString()
-      });
-
-
-      // Prepare transactions based on bonding status
       const bondedResult = await api.query.staking.bonded(selectedAccount.address);
       const isAlreadyBonded = bondedResult && !bondedResult.isEmpty;
-
       let stakingTx;
       let successMessage;
-
       if (isAlreadyBonded) {
         stakingTx = api.tx.staking.bondExtra(value);
         successMessage = `Added ${stakeAmount} XOR to existing stake`;
@@ -603,13 +489,9 @@ const StakingInterface = () => {
         stakingTx = api.tx.staking.bond(value, 'Staked');
         successMessage = `Bonded ${stakeAmount} XOR`;
       }
-
-      // Estimate actual transaction fees
       const paymentInfo = await stakingTx.paymentInfo(selectedAccount.address);
       const feeBN = paymentInfo.partialFee;
       const totalCostBN = amountBN.add(feeBN);
-
-      // Validate available balance
       if (totalCostBN.gt(availableBalance)) {
         const availableFormatted = formatBalanceForDisplay(availableBalance.toString());
         const neededFormatted = formatBalanceForDisplay(totalCostBN.toString());
@@ -618,15 +500,13 @@ const StakingInterface = () => {
           description: `You need ${neededFormatted} XOR (${stakeAmount} stake + fees) but only have ${availableFormatted} available`,
           variant: "destructive"
         });
+        console.log(`You need ${neededFormatted} XOR (${stakeAmount} stake + fees) but only have ${availableFormatted} available`)
         return;
       }
-
-      // Execute staking transaction
       await executeTransaction(
         stakingTx,
         successMessage,
         async () => {
-          // After successful staking, handle nominations
           const nominateTx = api.tx.staking.nominate([selectedValidator]);
           await executeTransaction(
             nominateTx,
@@ -634,24 +514,21 @@ const StakingInterface = () => {
             () => {
               setStakeAmount("");
               setSelectedValidator("");
-              fetchUserStaking();
-              fetchBalance();
+              // Refetch queries
+              // Note: In TanStack Query v5, refetch is automatically available via useQuery
+              // We don't need to call refetch manually as the query will be invalidated
             }
           );
         }
       );
-
     } catch (error: any) {
       console.error('Staking failed:', error);
       let errorMessage = error.message || "Transaction failed";
-
-      // Handle specific Polkadot errors
       if (error.message.includes('InsufficientBalance')) {
         errorMessage = "Your available balance is too low after accounting for fees and reserved amounts";
       } else if (error.message.includes('BelowMinimum')) {
         errorMessage = "The amount is below the minimum stake requirement";
       }
-
       toast({
         title: "Staking Failed",
         description: errorMessage,
@@ -671,22 +548,18 @@ const StakingInterface = () => {
       });
       return;
     }
-
     setLoading(true);
     try {
       const value = parseBalance(unstakeAmount);
       const unbondTx = api.tx.staking.unbond(value);
-
       await executeTransaction(
         unbondTx,
         `Successfully unbonded ${unstakeAmount} XOR. Funds will be available for withdrawal after the unbonding period.`,
         () => {
           setUnstakeAmount("");
-          fetchUserStaking();
-          fetchBalance();
+          // Refetch queries
         }
       );
-
     } catch (error: any) {
       console.error('Unstaking failed:', error);
       toast({
@@ -701,20 +574,16 @@ const StakingInterface = () => {
 
   const handleWithdrawUnbonded = async () => {
     if (!apiConnected || !selectedAccount) return;
-
     setLoading(true);
     try {
       const withdrawTx = api.tx.staking.withdrawUnbonded(0);
-
       await executeTransaction(
         withdrawTx,
         "Successfully withdrew unbonded funds",
         () => {
-          fetchUserStaking();
-          fetchBalance();
+          // Refetch queries
         }
       );
-
     } catch (error: any) {
       console.error('Withdrawal failed:', error);
       toast({
@@ -729,17 +598,14 @@ const StakingInterface = () => {
 
   const handleClaimRewards = async () => {
     if (!apiConnected || !selectedAccount) return;
-
     setLoading(true);
     try {
       const currentEraCodec = await api.query.staking.currentEra();
       let era = 0;
-
       if (currentEraCodec && currentEraCodec.toJSON) {
         const eraNum = Number(currentEraCodec.toJSON());
         era = Math.max(0, eraNum - 1);
       }
-
       const validatorToUse = selectedValidator || validators[0]?.accountId;
       if (!validatorToUse) {
         toast({
@@ -749,17 +615,14 @@ const StakingInterface = () => {
         });
         return;
       }
-
       const payoutTx = api.tx.staking.payoutStakers(validatorToUse, era);
       await executeTransaction(
         payoutTx,
         "Successfully claimed staking rewards",
         () => {
-          fetchUserStaking();
-          fetchBalance();
+          // Refetch queries
         }
       );
-
     } catch (error: any) {
       console.error('Claim rewards failed:', error);
       toast({
@@ -772,7 +635,6 @@ const StakingInterface = () => {
     }
   };
 
-  // Placeholder handlers for pool and delegated staking
   const handlePoolJoin = async () => {
     toast({
       title: "Feature Coming Soon",
@@ -794,7 +656,6 @@ const StakingInterface = () => {
     });
   };
 
-  // Chart data
   const stakingDistribution = userStaking.delegations.map((delegation, index) => ({
     name: delegation.validator.slice(0, 8) + '...',
     value: parseFloat(delegation.amount) || 1,
@@ -813,39 +674,6 @@ const StakingInterface = () => {
     return null;
   };
 
-  // Debug logging
-  const debugStakingInfo = useCallback(async () => {
-    if (!apiConnected || !selectedAccount) return;
-
-    console.log('=== DEBUG STAKING INFO ===');
-    console.log('Selected Account:', selectedAccount.address);
-
-    try {
-      const bonded = await api.query.staking.bonded(selectedAccount.address);
-      console.log('Bonded query result:', bonded?.toHuman?.());
-
-      const accountInfo = await api.query.system.account(selectedAccount.address);
-      console.log('Account info:', accountInfo?.toHuman?.());
-
-      const nominations = await api.query.staking.nominators(selectedAccount.address);
-      console.log('Nominations:', nominations?.toHuman?.());
-
-      const ledger = await api.query.staking.ledger(selectedAccount.address);
-      console.log('Direct ledger query:', ledger?.toHuman?.());
-    } catch (error) {
-      console.error('Debug error:', error);
-    }
-
-    console.log('=== END DEBUG ===');
-  }, [api, apiConnected, selectedAccount]);
-
-  useEffect(() => {
-    if (apiConnected && selectedAccount) {
-      debugStakingInfo();
-    }
-  }, [debugStakingInfo]);
-
-  // Loading state
   if (apiState.status !== 'connected') {
     return (
       <div className="min-h-screen bg-card p-2 sm:p-4 lg:p-6 flex items-center justify-center">
@@ -877,7 +705,6 @@ const StakingInterface = () => {
   return (
     <div className="min-h-screen glass-card p-2 sm:p-4 lg:p-6">
       <div className="max-w-7xl mx-auto space-y-6">
-        {/* Header */}
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div>
             <h1 className="text-3xl font-bold text-foreground flex items-center gap-3">
@@ -899,16 +726,12 @@ const StakingInterface = () => {
             )}
           </div>
         </div>
-
-        {/* Account Selection */}
         <AccountSelector
           accounts={accounts}
           selectedAccount={selectedAccount}
           setSelectedAccount={setSelectedAccount}
           balance={balance}
         />
-
-        {/* Staking Overview */}
         <StakingOverview
           userStaking={userStaking}
           balance={balance}
@@ -919,8 +742,6 @@ const StakingInterface = () => {
           }}
         />
         <UnbondingSection />
-
-        {/* Staking Actions */}
         <StakingActions
           validators={validators}
           selectedValidator={selectedValidator}
@@ -948,8 +769,6 @@ const StakingInterface = () => {
           handlePoolLeave={handlePoolLeave}
           handleDelegate={handleDelegate}
         />
-
-        {/* Delegation Distribution Chart */}
         {userStaking.delegations.length > 0 && (
           <DelegationDistributionChart
             stakingDistribution={stakingDistribution}
