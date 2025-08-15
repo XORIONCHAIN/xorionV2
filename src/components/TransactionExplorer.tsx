@@ -1,21 +1,17 @@
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { FaSearch, FaExternalLinkAlt, FaCopy, FaFilter, FaBars, FaClock, FaArrowLeft, FaCheckCircle, FaTimesCircle, FaInfoCircle } from 'react-icons/fa';
+import { TableCell, TableRow } from '@/components/ui/table';
+import { FaSearch, FaCheckCircle, FaTimesCircle, FaInfoCircle } from 'react-icons/fa';
 import { useToast } from '@/hooks/use-toast';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { usePolkadotStore } from '@/stores/polkadotStore';
 import { cn } from '@/lib/utils';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Separator } from '@/components/ui/separator';
-import { ScrollArea } from '@/components/ui/scroll-area';
 import TransactionExplorerHeader from './TransactionExplorerHeader';
 import ConnectionStatusCard from './ConnectionStatusCard';
-import TransactionExplorerSidebar from './TransactionExplorerSidebar';
 import TransactionsTable from './TransactionsTable';
 import BlocksTable from './BlocksTable';
 import PaginationControls from './PaginationControls';
@@ -107,29 +103,26 @@ const TransactionExplorer = () => {
     resetDetailsState
   } = usePolkadotStore();
 
-  // Debug log for fetched transactions
+  // Debug log for fetched transactions (enhanced with more details)
   useEffect(() => {
     if (transactionData && transactionData.transactions) {
-      console.log('Fetched transactions:', transactionData.transactions);
-      console.log('Transfer transactions:', transactionData.transactions.filter(tx => tx.isTransfer));
-      console.log('Fetched blocks:', transactionData.blocks);
     }
   }, [transactionData]);
 
   // ENHANCED FILTER TRANSACTIONS WITH BETTER TRANSFER DETECTION
   const filteredExtrinsics = useMemo(() => {
     const transactions = transactionData.transactions || [];
-    
-    return transactions.filter(tx => {
+
+    const filtered = transactions.filter(tx => {
       // Search filter - check hash, signer, method, and transfer details
       const searchLower = debouncedSearchQuery.toLowerCase();
-      const matchesSearch = !searchLower || 
+      const matchesSearch = !searchLower ||
         tx.hash.toLowerCase().includes(searchLower) ||
         tx.signer.toLowerCase().includes(searchLower) ||
         `${tx.section}.${tx.method}`.toLowerCase().includes(searchLower) ||
         (tx.transferTo && tx.transferTo.toLowerCase().includes(searchLower)) ||
         (tx.transferAmount && tx.transferAmount.toLowerCase().includes(searchLower));
-      
+
       // Type filter - enhanced with better transfer detection
       let matchesFilter = true;
       switch (filterType) {
@@ -138,7 +131,7 @@ const TransactionExplorer = () => {
           break;
         case 'transfers':
           // Use the enhanced transfer detection from the store
-          matchesFilter = tx.isTransfer === true || 
+          matchesFilter = tx.isTransfer === true ||
                         (tx.section === 'balances' && tx.method.toLowerCase().includes('transfer')) ||
                         (tx.section === 'currencies' && tx.method.toLowerCase().includes('transfer')) ||
                         (tx.section === 'tokens' && tx.method.toLowerCase().includes('transfer')) ||
@@ -151,20 +144,22 @@ const TransactionExplorer = () => {
           matchesFilter = tx.section === 'system';
           break;
         case 'governance':
-          matchesFilter = tx.section === 'democracy' || tx.section === 'council' || 
+          matchesFilter = tx.section === 'democracy' || tx.section === 'council' ||
                         tx.section === 'treasury' || tx.section === 'referenda';
           break;
         default:
           matchesFilter = true;
       }
-      
+
       return matchesSearch && matchesFilter;
     });
+    return filtered;
   }, [transactionData.transactions, debouncedSearchQuery, filterType]);
 
   // PAGINATE THE FILTERED TRANSACTIONS
   const paginatedExtrinsics = useMemo(() => {
-    return filteredExtrinsics.slice((currentPage - 1) * 10, currentPage * 10);
+    const paginated = filteredExtrinsics.slice((currentPage - 1) * 10, currentPage * 10);
+    return paginated;
   }, [filteredExtrinsics, currentPage]);
 
   // FETCH DATA WHEN CONNECTED
@@ -183,13 +178,12 @@ const TransactionExplorer = () => {
   const handleSearchDetails = async () => {
     if (detailsSearchHash.trim()) {
       const normalizedHash = detailsSearchHash.trim();
-      console.log('🔍 Searching for transaction:', normalizedHash);
-      
+
       // Validate hash format
-      const isValidHash = normalizedHash.length === 64 || 
+      const isValidHash = normalizedHash.length === 64 ||
                          (normalizedHash.startsWith('0x') && normalizedHash.length === 66) ||
                          (normalizedHash.length === 64 && !normalizedHash.startsWith('0x'));
-      
+
       if (!isValidHash) {
         toast({
           title: "Invalid Hash Format",
@@ -198,20 +192,20 @@ const TransactionExplorer = () => {
         });
         return;
       }
-      
+
       // Reset any previous state
       resetDetailsState();
-      
+
       // Show modal immediately
       setShowDetailsDialog(true);
-      
+
       // Then fetch details (store handles loading state)
       try {
         await fetchTransactionDetails(normalizedHash);
-        
+
         // Check if we found the transaction
         const { transactionDetails, detailsError } = usePolkadotStore.getState();
-        
+
         if (transactionDetails) {
           toast({
             title: "Transaction Found!",
@@ -267,7 +261,7 @@ const TransactionExplorer = () => {
     if (isTransfer) {
       return 'bg-gradient-to-r from-green-500/20 to-emerald-500/20 text-green-500 border-green-500/30';
     }
-    
+
     switch (section) {
       case 'balances': return 'bg-gradient-blue-purple text-blue-500 border-blue-500/30';
       case 'staking': return 'bg-gradient-purple-indigo text-purple-500 border-purple-500/30';
@@ -286,7 +280,7 @@ const TransactionExplorer = () => {
     { value: 'transfers', label: 'Transfers', count: transactionData.transactions?.filter(tx => tx.isTransfer).length || 0 },
     { value: 'staking', label: 'Staking', count: transactionData.transactions?.filter(tx => tx.section === 'staking').length || 0 },
     { value: 'system', label: 'System', count: transactionData.transactions?.filter(tx => tx.section === 'system').length || 0 },
-    { value: 'governance', label: 'Governance', count: transactionData.transactions?.filter(tx => 
+    { value: 'governance', label: 'Governance', count: transactionData.transactions?.filter(tx =>
       ['democracy', 'council', 'treasury', 'referenda'].includes(tx.section)).length || 0 }
   ];
 
@@ -300,7 +294,6 @@ const TransactionExplorer = () => {
     return <ConnectionStatusCard apiState={apiState} />;
   }
 
-  // IF CONNECTED, SHOW MAIN UI
   const hasData = transactionData.lastUpdated > 0;
   const showSkeleton = !hasData && isTransactionLoading;
   const totalPages = Math.max(1, Math.ceil(filteredExtrinsics.length / 10));
@@ -319,7 +312,7 @@ const TransactionExplorer = () => {
           sidebarOpen={sidebarOpen}
           setSidebarOpen={setSidebarOpen}
         />
-        
+
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
           {/* Sidebar */}
           <div className={cn(
@@ -327,7 +320,7 @@ const TransactionExplorer = () => {
             sidebarOpen ? "block" : "hidden lg:block"
           )}>
             <h2 className="text-white text-xl font-bold mb-4">Search & Filter</h2>
-            
+
             {/* Enhanced Sidebar with Filter Counts */}
             <Card>
               <CardHeader>
@@ -343,7 +336,7 @@ const TransactionExplorer = () => {
                     className="pl-10"
                   />
                 </div>
-                
+
                 <div>
                   <label className="text-sm font-medium mb-2 block">Filter by Type</label>
                   <Select value={filterType} onValueChange={setFilterType}>
@@ -386,7 +379,7 @@ const TransactionExplorer = () => {
                   </p>
                 </div>
                 <div className="flex space-x-2">
-                  <Button 
+                  <Button
                     onClick={handleSearchDetails}
                     disabled={!detailsSearchHash.trim() || isDetailsLoading}
                     className="flex-1"
@@ -395,7 +388,7 @@ const TransactionExplorer = () => {
                     {isDetailsLoading ? 'Searching...' : 'Search Details'}
                   </Button>
                   {isDetailsLoading && (
-                    <Button 
+                    <Button
                       onClick={resetDetailsState}
                       variant="outline"
                       size="sm"
@@ -436,7 +429,7 @@ const TransactionExplorer = () => {
               </CardContent>
             </Card>
           </div>
-          
+
           {/* Main Content */}
           <div className="lg:col-span-3 space-y-6">
             <Tabs defaultValue="transactions" className="space-y-4">
@@ -458,7 +451,7 @@ const TransactionExplorer = () => {
                   )}
                 </TabsTrigger>
               </TabsList>
-              
+
               <TabsContent value="transactions" className="space-y-4">
                 <Card>
                   <CardHeader>
@@ -476,14 +469,14 @@ const TransactionExplorer = () => {
                       <div className="text-center text-muted-foreground py-8">
                         <FaInfoCircle className="w-8 h-8 mx-auto mb-2 opacity-50" />
                         <p className="text-lg">
-                          {debouncedSearchQuery || filterType !== 'all' 
-                            ? 'No transactions match your search criteria.' 
+                          {debouncedSearchQuery || filterType !== 'all'
+                            ? 'No transactions match your search criteria.'
                             : 'No transactions found on this network.'}
                         </p>
                         {(debouncedSearchQuery || filterType !== 'all') && (
-                          <Button 
-                            variant="outline" 
-                            size="sm" 
+                          <Button
+                            variant="outline"
+                            size="sm"
                             className="mt-2"
                             onClick={() => {
                               setSearchQuery('');
@@ -505,7 +498,7 @@ const TransactionExplorer = () => {
                         handleCopyToClipboard={handleCopyToClipboard}
                       />
                     )}
-                    
+
                     {!isEmpty && (
                       <PaginationControls
                         currentPage={currentPage}
@@ -518,7 +511,7 @@ const TransactionExplorer = () => {
                   </CardContent>
                 </Card>
               </TabsContent>
-              
+
               <TabsContent value="blocks" className="space-y-4">
                 <Card>
                   <CardHeader>
@@ -540,7 +533,7 @@ const TransactionExplorer = () => {
           </div>
         </div>
       </div>
-      
+
       {/* Transaction Details Dialog */}
       <TransactionDetailsDialog
         open={showDetailsDialog}

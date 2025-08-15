@@ -336,7 +336,7 @@ export const usePolkadotStore = create<PolkadotStore>()(
 
           const api = await ApiPromise.create({
             provider,
-            metadata,
+            // metadata,
             throwOnConnect: false,
             noInitWarn: true,
             initWasm: false,
@@ -484,6 +484,7 @@ export const usePolkadotStore = create<PolkadotStore>()(
         getCached,
         setCached,
       } = get();
+      console.log("Endpoint is: ", ENDPOINTS, "About to get the data and the api state is ", api, apiState);
 
       if (!api || apiState.status !== "connected") {
         setTransactionLoading(false);
@@ -496,13 +497,13 @@ export const usePolkadotStore = create<PolkadotStore>()(
 
       try {
         const cachedData = getCached("transactionData");
+        console.log("Getting cached data ", cachedData)
         if (cachedData) {
           setTransactionData(cachedData);
           setTransactionLoading(false);
           setTransactionFetching(false);
           return;
         }
-
         const transactionData = await fetchEnhancedTransactionData(api);
 
         setTransactionData(transactionData);
@@ -837,36 +838,68 @@ async function fetchNetworkDataWithTimeout(api: ApiPromise) {
 
 // FIXED: Enhanced transaction data fetching with proper transfer detection
 async function fetchEnhancedTransactionData(api: ApiPromise) {
-  const finalizedHead = await api.rpc.chain.getFinalizedHead();
-  const latestBlockNumber = (
-    await api.rpc.chain.getHeader(finalizedHead)
-  ).number.toNumber();
+  // const finalizedHead = await api.rpc.chain.getFinalizedHead();
+  let finalizedHead;
+  try {
+    finalizedHead = await api.rpc.chain.getFinalizedHead();
+    console.log('📊 Finalized head:', finalizedHead.toHex());
+  } catch (error) {
+    console.error('❌ Failed to get finalized head:', error);
+    return { transactions: [], blocks: [], lastUpdated: Date.now() };
+  }
 
+  let latestBlockNumber;
+  try {
+    const header = await api.rpc.chain.getHeader(finalizedHead);
+    latestBlockNumber = header.number.toNumber();
+    console.log('📊 Latest block number:', latestBlockNumber);
+  } catch (error) {
+    console.error('❌ Failed to get header for finalized head:', error);
+    return { transactions: [], blocks: [], lastUpdated: Date.now() };
+  }
   const blockNumbers = Array.from(
-    { length: 10 },
+    { length: 5 },
     (_, i) => latestBlockNumber - i
   ).filter((n) => n >= 0);
 
   // 1. Get all block hashes in parallel
   const blockHashes = await Promise.all(
-    blockNumbers.map((number) => api.rpc.chain.getBlockHash(number))
-  );
-
+        blockNumbers.map(async (number) => {
+          try {
+            const hash = await api.rpc.chain.getBlockHash(number);
+            console.log(`📊 Block ${number} hash:`, hash.toHex());
+            return hash;
+          } catch (error) {
+            console.error(`❌ Failed to get hash for block ${number}:`, error);
+            return null;
+          }
+        })
+      );
   // 2. Get all blocks and events in parallel
-  const blocksAndEvents = await Promise.all(
-    blockHashes.map((hash) =>
-      Promise.all([
-        api.rpc.chain.getBlock(hash),
-        api.query.system.events.at(hash),
-      ])
-    )
-  );
+
+const blocksAndEvents = await Promise.all(
+        blockHashes.map(async (hash, index) => {
+          if (!hash) return null;
+          try {
+            const [block, events] = await Promise.all([
+              api.rpc.chain.getBlock(hash),
+              api.query.system.events.at(hash),
+            ]);
+            console.log(`📊 Block ${blockNumbers[index]}: extrinsics=${block.block.extrinsics.length}, events=${events.length}`);
+            return [block, events];
+          } catch (error) {
+            console.error(`❌ Failed to fetch block ${blockNumbers[index]}:`, error);
+            return null;
+          }
+        })
+      );
 
   const blocks: Block[] = [];
   const transactions: Transaction[] = [];
 
   // 3. Process the pre-fetched data
   for (let i = 0; i < blockNumbers.length; i++) {
+    if (!blocksAndEvents[i]) continue;
     const blockNumber = blockNumbers[i];
     const [block, events] = blocksAndEvents[i];
 
@@ -874,7 +907,7 @@ async function fetchEnhancedTransactionData(api: ApiPromise) {
       let timestamp: Date | null = null;
       const timestampExtrinsic = block.block.extrinsics.find(
         (ext) =>
-          ext.method.section === "timestamp" && ext.method.method === "set"
+        ext.method.section === "timestamp" && ext.method.method === "set"
       );
       if (timestampExtrinsic) {
         const timestampArg = timestampExtrinsic.method.args[0];
@@ -898,55 +931,55 @@ async function fetchEnhancedTransactionData(api: ApiPromise) {
         const eventsArray = events as unknown as any[];
         const extrinsicEvents = eventsArray.filter(
           ({ phase }) =>
-            phase.isApplyExtrinsic && phase.asApplyExtrinsic.eq(index)
+          phase.isApplyExtrinsic && phase.asApplyExtrinsic.eq(index)
         );
 
         // Determine success status
         const success = !extrinsicEvents.some(({ event }) =>
-          api.events.system.ExtrinsicFailed.is(event)
-        );
+                                              api.events.system.ExtrinsicFailed.is(event)
+                                             );
 
-        // Enhanced transfer detection
-        const transferInfo = detectTransferFromExtrinsic(
-          extrinsic,
-          extrinsicEvents,
-          api
-        );
+                                             // Enhanced transfer detection
+                                             const transferInfo = detectTransferFromExtrinsic(
+                                               extrinsic,
+                                               extrinsicEvents,
+                                               api
+                                             );
 
-        // Calculate fee
-        const fee = calculateTransactionFee(extrinsicEvents, api);
+                                             // Calculate fee
+                                             const fee = calculateTransactionFee(extrinsicEvents, api);
 
-        const transaction: Transaction = {
-          hash: txHash,
-          blockNumber,
-          blockHash: blockHashes[i].toHex(),
-          index,
-          method: extrinsic.method.method,
-          section: extrinsic.method.section,
-          signer: extrinsic.signer?.toString() || "System",
-          timestamp,
-          success,
-          fee: formatTxor(fee),
-          args: extrinsic.method.args.map((arg) => arg.toString().slice(0, 50)),
-          isTransfer: transferInfo.isTransfer,
-          transferFrom: transferInfo.from,
-          transferTo: transferInfo.to,
-          transferAmount: transferInfo.amount
-            ? formatTxor(transferInfo.amount)
-            : undefined,
-          transferAsset: transferInfo.asset,
-          events: extrinsicEvents.map(({ event, phase }) => ({
-            phase: phase?.toString() || "Unknown",
-            event: {
-              section: event.section,
-              method: event.method,
-              data: event.data.toHuman(),
-            },
-          })),
-          decodedData: transferInfo.decodedData,
-        };
+                                             const transaction: Transaction = {
+                                               hash: txHash,
+                                               blockNumber,
+                                               blockHash: blockHashes[i].toHex(),
+                                               index,
+                                               method: extrinsic.method.method,
+                                               section: extrinsic.method.section,
+                                               signer: extrinsic.signer?.toString() || "System",
+                                               timestamp,
+                                               success,
+                                               fee: formatTxor(fee),
+                                               args: extrinsic.method.args.map((arg) => arg.toString().slice(0, 50)),
+                                                 isTransfer: transferInfo.isTransfer,
+                                               transferFrom: transferInfo.from,
+                                               transferTo: transferInfo.to,
+                                               transferAmount: transferInfo.amount
+                                                 ? formatTxor(transferInfo.amount)
+                                                 : undefined,
+                                                 transferAsset: transferInfo.asset,
+                                                 events: extrinsicEvents.map(({ event, phase }) => ({
+                                                   phase: phase?.toString() || "Unknown",
+                                                   event: {
+                                                     section: event.section,
+                                                     method: event.method,
+                                                     data: event.data.toHuman(),
+                                                   },
+                                                 })),
+                                                 decodedData: transferInfo.decodedData,
+                                             };
 
-        transactions.push(transaction);
+                                             transactions.push(transaction);
       });
     } catch (error) {
       console.warn(`Failed to process block ${blockNumber}:`, error);
@@ -955,9 +988,9 @@ async function fetchEnhancedTransactionData(api: ApiPromise) {
 
   return {
     transactions: transactions
-      .slice(0, 100)
-      .sort((a, b) => b.blockNumber - a.blockNumber),
-    blocks,
+    .slice(0, 100)
+    .sort((a, b) => b.blockNumber - a.blockNumber),
+      blocks,
     lastUpdated: Date.now(),
   };
 }
@@ -993,12 +1026,12 @@ function detectTransferFromExtrinsic(
 
   if (
     (section === "balances" ||
-      section === "currencies" ||
-      section === "tokens" ||
-      section === "assets") &&
+     section === "currencies" ||
+   section === "tokens" ||
+ section === "assets") &&
     transferMethods.some((tm) =>
-      method.toLowerCase().includes(tm.toLowerCase())
-    )
+                         method.toLowerCase().includes(tm.toLowerCase())
+                        )
   ) {
     transferInfo.isTransfer = true;
     transferInfo.from = extrinsic.signer?.toString();
@@ -1020,13 +1053,13 @@ function detectTransferFromExtrinsic(
   const transferEvents = events.filter(({ event }) => {
     return (
       api.events.balances?.Transfer?.is(event) ||
-      api.events.currencies?.Transferred?.is(event) ||
-      api.events.tokens?.Transfer?.is(event) ||
-      api.events.assets?.Transferred?.is(event) ||
-      (event.section === "balances" && event.method === "Transfer") ||
-      (event.section === "currencies" && event.method === "Transferred") ||
-      (event.section === "tokens" && event.method === "Transfer") ||
-      (event.section === "assets" && event.method === "Transferred")
+        api.events.currencies?.Transferred?.is(event) ||
+        api.events.tokens?.Transfer?.is(event) ||
+        api.events.assets?.Transferred?.is(event) ||
+        (event.section === "balances" && event.method === "Transfer") ||
+        (event.section === "currencies" && event.method === "Transferred") ||
+        (event.section === "tokens" && event.method === "Transfer") ||
+        (event.section === "assets" && event.method === "Transferred")
     );
   });
 
@@ -1064,7 +1097,7 @@ function detectTransferFromExtrinsic(
       section,
       method,
       args: args.map((arg) => arg.toHuman()),
-      isStaking: true,
+        isStaking: true,
     };
   }
 
@@ -1075,11 +1108,11 @@ function detectTransferFromExtrinsic(
 function calculateTransactionFee(events: any[], api: ApiPromise): string {
   const feeEvents = events.filter(
     ({ event }) =>
-      api.events.balances?.Withdraw?.is(event) ||
+    api.events.balances?.Withdraw?.is(event) ||
       api.events.transactionPayment?.TransactionFeePaid?.is(event) ||
       (event.section === "balances" && event.method === "Withdraw") ||
       (event.section === "transactionPayment" &&
-        event.method === "TransactionFeePaid")
+       event.method === "TransactionFeePaid")
   );
 
   if (feeEvents.length > 0) {
@@ -1107,25 +1140,25 @@ async function findTransactionByHash(
       ? normalizedHash
       : `0x${normalizedHash}`;
 
-    console.log(`🔍 Searching for transaction hash: ${searchHash}`);
+      console.log(`🔍 Searching for transaction hash: ${searchHash}`);
 
-    // Add timeout to prevent hanging
-    const searchPromise = performTransactionSearch(
-      api,
-      searchHash,
-      normalizedHash
-    );
-    const timeoutPromise = new Promise<null>((_, reject) =>
-      setTimeout(
-        () =>
-          reject(
-            new Error("Search timeout - transaction not found in recent blocks")
-          ),
-        30000
-      )
-    );
+      // Add timeout to prevent hanging
+      const searchPromise = performTransactionSearch(
+        api,
+        searchHash,
+        normalizedHash
+      );
+      const timeoutPromise = new Promise<null>((_, reject) =>
+                                               setTimeout(
+                                                 () =>
+                                                 reject(
+                                                   new Error("Search timeout - transaction not found in recent blocks")
+                                                 ),
+                                                 30000
+                                               )
+                                              );
 
-    return await Promise.race([searchPromise, timeoutPromise]);
+                                              return await Promise.race([searchPromise, timeoutPromise]);
   } catch (error) {
     console.error("Error finding transaction:", error);
     throw error;
@@ -1167,11 +1200,11 @@ async function performTransactionSearch(
         // Try multiple hash formats for better matching
         return (
           extHash === searchHash ||
-          extHash === normalizedHash ||
-          extHash.toLowerCase() === searchHash.toLowerCase() ||
-          extHash.toLowerCase() === normalizedHash.toLowerCase() ||
-          extHash === searchHash.replace("0x", "") ||
-          extHash === normalizedHash.replace("0x", "")
+            extHash === normalizedHash ||
+            extHash.toLowerCase() === searchHash.toLowerCase() ||
+            extHash.toLowerCase() === normalizedHash.toLowerCase() ||
+            extHash === searchHash.replace("0x", "") ||
+            extHash === normalizedHash.replace("0x", "")
         );
       });
 
@@ -1186,68 +1219,68 @@ async function performTransactionSearch(
         const eventsArray = events as unknown as any[];
         const extrinsicEvents = eventsArray.filter(
           ({ phase }) =>
-            phase.isApplyExtrinsic && phase.asApplyExtrinsic.eq(extrinsicIndex)
+          phase.isApplyExtrinsic && phase.asApplyExtrinsic.eq(extrinsicIndex)
         );
 
         // Determine success
         const success = !extrinsicEvents.some(({ event }) =>
-          api.events.system.ExtrinsicFailed.is(event)
-        );
+                                              api.events.system.ExtrinsicFailed.is(event)
+                                             );
 
-        // Get timestamp
-        let timestamp: Date | null = null;
-        const timestampExtrinsic = block.block.extrinsics.find(
-          (ext) =>
-            ext.method.section === "timestamp" && ext.method.method === "set"
-        );
-        if (timestampExtrinsic) {
-          const timestampArg = timestampExtrinsic.method.args[0];
-          timestamp = new Date(Number(timestampArg.toString()));
-        }
+                                             // Get timestamp
+                                             let timestamp: Date | null = null;
+                                             const timestampExtrinsic = block.block.extrinsics.find(
+                                               (ext) =>
+                                               ext.method.section === "timestamp" && ext.method.method === "set"
+                                             );
+                                             if (timestampExtrinsic) {
+                                               const timestampArg = timestampExtrinsic.method.args[0];
+                                               timestamp = new Date(Number(timestampArg.toString()));
+                                             }
 
-        // Calculate fee
-        const fee = calculateTransactionFee(extrinsicEvents, api);
+                                             // Calculate fee
+                                             const fee = calculateTransactionFee(extrinsicEvents, api);
 
-        // Enhanced transfer detection
-        const transferInfo = detectTransferFromExtrinsic(
-          extrinsic,
-          extrinsicEvents,
-          api
-        );
+                                             // Enhanced transfer detection
+                                             const transferInfo = detectTransferFromExtrinsic(
+                                               extrinsic,
+                                               extrinsicEvents,
+                                               api
+                                             );
 
-        const transactionDetails: TransactionDetails = {
-          hash: extrinsic.hash.toHex(),
-          blockNumber,
-          blockHash: blockHash.toHex(),
-          index: extrinsicIndex,
-          method: extrinsic.method.method,
-          section: extrinsic.method.section,
-          signer: extrinsic.signer?.toString() || "System",
-          timestamp,
-          success,
-          fee: formatTxor(fee),
-          args: extrinsic.method.args.map((arg) => arg.toString()),
-          events: extrinsicEvents.map(({ event, phase }) => ({
-            phase: phase?.toString() || "Unknown",
-            event: {
-              section: event.section,
-              method: event.method,
-              data: event.data.toHuman(),
-            },
-          })),
-          error: success ? null : "Transaction failed",
-          nonce: extrinsic.nonce?.toNumber() || 0,
-          tip: extrinsic.tip?.toString() || "0",
-          era: extrinsic.era?.toNumber() || 0,
-          signature: extrinsic.signature?.toString() || "",
-          isDecoded: true,
-          decodedArgs: extrinsic.method.args.map((arg) => arg.toHuman()),
-        };
+                                             const transactionDetails: TransactionDetails = {
+                                               hash: extrinsic.hash.toHex(),
+                                               blockNumber,
+                                               blockHash: blockHash.toHex(),
+                                               index: extrinsicIndex,
+                                               method: extrinsic.method.method,
+                                               section: extrinsic.method.section,
+                                               signer: extrinsic.signer?.toString() || "System",
+                                               timestamp,
+                                               success,
+                                               fee: formatTxor(fee),
+                                               args: extrinsic.method.args.map((arg) => arg.toString()),
+                                                 events: extrinsicEvents.map(({ event, phase }) => ({
+                                                 phase: phase?.toString() || "Unknown",
+                                                 event: {
+                                                   section: event.section,
+                                                   method: event.method,
+                                                   data: event.data.toHuman(),
+                                                 },
+                                               })),
+                                               error: success ? null : "Transaction failed",
+                                               nonce: extrinsic.nonce?.toNumber() || 0,
+                                               tip: extrinsic.tip?.toString() || "0",
+                                               era: extrinsic.era?.toNumber() || 0,
+                                               signature: extrinsic.signature?.toString() || "",
+                                               isDecoded: true,
+                                               decodedArgs: extrinsic.method.args.map((arg) => arg.toHuman()),
+                                             };
 
-        console.log(
-          ` Transaction details: ${transactionDetails.method}.${transactionDetails.section} in block ${blockNumber}`
-        );
-        return transactionDetails;
+                                               console.log(
+                                                 ` Transaction details: ${transactionDetails.method}.${transactionDetails.section} in block ${blockNumber}`
+                                               );
+                                               return transactionDetails;
       }
     } catch (error) {
       console.warn(`Error searching block ${blockNumber}:`, error);
@@ -1279,7 +1312,7 @@ async function fetchTransactionDataWithTimeout(api: ApiPromise) {
       let timestamp: Date | null = null;
       const timestampExtrinsic = block.block.extrinsics.find(
         (ext) =>
-          ext.method.section === "timestamp" && ext.method.method === "set"
+        ext.method.section === "timestamp" && ext.method.method === "set"
       );
       if (timestampExtrinsic) {
         const timestampArg = timestampExtrinsic.method.args[0];
@@ -1308,7 +1341,7 @@ async function fetchTransactionDataWithTimeout(api: ApiPromise) {
           success: true,
           fee: "0",
           args: extrinsic.method.args.map((arg) => arg.toString().slice(0, 20)),
-          isTransfer: false,
+            isTransfer: false,
           events: [],
         });
       });

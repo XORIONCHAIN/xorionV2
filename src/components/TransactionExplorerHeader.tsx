@@ -54,4 +54,4 @@ const TransactionExplorerHeader: React.FC<TransactionExplorerHeaderProps> = ({
   </div>
 );
 
-export default TransactionExplorerHeader; 
+export default TransactionExplorerHeader;

@@ -38,10 +38,10 @@ class PersistentPolkadotApi {
     import.meta.env.VITE_POLKADOT_ENDPOINTS
       ? import.meta.env.VITE_POLKADOT_ENDPOINTS.split(',')
       : [
-          'wss://rpc.polkadot.io',
-          'wss://polkadot.api.onfinality.io/public-ws',
-          'wss://polkadot-rpc.dwellir.com'
-        ]
+        'wss://rpc.polkadot.io',
+        'wss://polkadot.api.onfinality.io/public-ws',
+        'wss://polkadot-rpc.dwellir.com'
+      ]
   )) {
     this.endpoints = endpoints;
     this.setupHealthMonitoring();
@@ -88,7 +88,7 @@ class PersistentPolkadotApi {
       this.updateState({ endpoint });
 
       this.provider = new WsProvider(endpoint, this.connectionTimeout);
-      
+
       // SETUP PROVIDER EVENT HANDLERS
       this.provider.on('connected', () => this.handleConnected());
       this.provider.on('disconnected', () => this.handleDisconnected());
@@ -107,10 +107,10 @@ class PersistentPolkadotApi {
       this.api.on('error', (error: Error) => this.handleError(error));
 
       await this.api.isReady;
-      
+
       // VERIFY CONNECTION WITH A SIMPLE RPC CALL
       await this.api.rpc.system.chain();
-      
+
       this.updateState({
         status: 'connected',
         api: this.api,
@@ -134,7 +134,7 @@ class PersistentPolkadotApi {
         this.api.off('error', this.handleError);
         await this.api.disconnect();
       }
-      
+
       if (this.provider) {
         // WsProvider doesn't have off method, just disconnect
         this.provider.disconnect();
