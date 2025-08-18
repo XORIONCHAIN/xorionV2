@@ -1,34 +1,45 @@
-import { useState, useEffect } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Loader2 } from 'lucide-react';
-import { usePolkadot } from '@/hooks/use-polkadot';
+import { useState, useEffect } from "react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Loader2 } from "lucide-react";
+import { usePolkadot } from "@/hooks/use-polkadot";
 
 const BridgeRelayerMonitor = () => {
   const { api, isConnected, isConnecting } = usePolkadot();
   const [relayers, setRelayers] = useState([]);
   const [isPaused, setIsPaused] = useState(null);
-  const [error, setError] = useState('');
+  const [error, setError] = useState("");
   const [isLoading, setIsLoading] = useState(true);
 
   // Fetch relayers and paused status
   useEffect(() => {
     const fetchData = async () => {
+      const isReady = await api.isReady;
+      console.log("Isready", isReady);
+
       if (!api || !isConnected) return;
       setIsLoading(true);
+      const query = await api.query;
+      // Log available pallets for debugging
+      console.log(
+        "Bridge pallet",
+        query.bridge,
+        "Etherum bridge: ",
+        query.ethereumBridge
+      );
       try {
         // Fetch relayers
         const relayerAddresses = await api.query.bridge.relayers();
-        const relayersAsHex = relayerAddresses.map(addr => addr.toHex());
+        const relayersAsHex = relayerAddresses.map((addr) => addr.toHex());
         setRelayers(relayersAsHex);
 
         // Fetch paused status
         const isPaused = await api.query.bridge.paused();
         setIsPaused(isPaused.toPrimitive());
 
-        setError('');
+        setError("");
       } catch (err) {
-        setError('Failed to fetch bridge data: ' + err.message);
+        setError("Failed to fetch bridge data: " + err.message);
       } finally {
         setIsLoading(false);
       }
@@ -54,7 +65,9 @@ const BridgeRelayerMonitor = () => {
         )}
         {!isConnected && !isConnecting && (
           <Alert variant="destructive" className="mb-4">
-            <AlertDescription>Blockchain node not connected. Please try again later.</AlertDescription>
+            <AlertDescription>
+              Blockchain node not connected. Please try again later.
+            </AlertDescription>
           </Alert>
         )}
         {isConnected && isLoading && (
@@ -66,7 +79,7 @@ const BridgeRelayerMonitor = () => {
           <div className="space-y-4">
             <div>
               <h3 className="font-semibold">Bridge Paused:</h3>
-              <p>{isPaused ? 'Yes' : 'No'}</p>
+              <p>{isPaused ? "Yes" : "No"}</p>
             </div>
             <div>
               <h3 className="font-semibold">Relayers:</h3>

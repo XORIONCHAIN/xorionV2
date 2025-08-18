@@ -14,7 +14,8 @@ import { Button } from "@/components/ui/button";
 import { Menu } from "lucide-react";
 import Footer from "@/components/Footer";
 import AirdropPanel from "@/components/AirdropPanel";
-import { GiTwoCoins } from "react-icons/gi";
+import { GiSecurityGate, GiTwoCoins } from "react-icons/gi";
+import ConfidentialPanel from "@/components/ConfidentialPanel";
 
 // LAZY LOADED COMPONENTS
 const StakingInterface = lazy(() => import("@/components/StakingInterface"));
@@ -148,6 +149,7 @@ const Index = () => {
     { id: "transfer", label: "Transfer", icon: FaPaperPlane },
     { id: "airdrop", label: "Airdrop", icon: GiTwoCoins },
     { id: "bridge", label: "Bridge", icon: GiTwoCoins },
+    { id: "confidential", label: "Confidential (zk)", icon: GiSecurityGate },
   ];
 
   const renderContent = () => {
@@ -191,6 +193,12 @@ const Index = () => {
               <BridgeLockForm onSearchTransaction={handleSearchTransaction} />
               <BridgeRelayerMonitor />
             </div>
+          </Suspense>
+        );
+      case "confidential":
+        return (
+          <Suspense fallback={<div>Loading bridge</div>}>
+            <ConfidentialPanel />
           </Suspense>
         );
       default:

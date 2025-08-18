@@ -1,62 +1,85 @@
-import { useState } from 'react';
-import { web3FromSource } from '@polkadot/extension-dapp';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Loader2 } from 'lucide-react';
-import { useWallet } from './WalletConnection';
-import { usePolkadot } from '@/hooks/use-polkadot';
+import { useState } from "react";
+import { web3FromSource } from "@polkadot/extension-dapp";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Loader2 } from "lucide-react";
+import { useWallet } from "./WalletConnection";
+import { usePolkadot } from "@/hooks/use-polkadot";
 
 const BridgeLockForm = ({ onSearchTransaction }) => {
   const { api, isConnected, isConnecting } = usePolkadot();
   const { selectedAccount } = useWallet();
-  const [amount, setAmount] = useState('');
-  const [relayerFee, setRelayerFee] = useState('');
-  const [ethRecipient, setEthRecipient] = useState('');
-  const [nonce, setNonce] = useState('');
+  const [amount, setAmount] = useState("");
+  const [relayerFee, setRelayerFee] = useState("");
+  const [ethRecipient, setEthRecipient] = useState("");
+  const [nonce, setNonce] = useState("");
   const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState('');
-  const [success, setSuccess] = useState('');
+  const [error, setError] = useState("");
+  const [success, setSuccess] = useState("");
 
   // Lock tokens function
   const lockTokens = async () => {
-    if (!api || !selectedAccount || !amount || !relayerFee || !ethRecipient || !nonce) {
-      setError('Please fill in all fields and connect a wallet.');
+    const isReady = await api.isReady;
+    console.log("Isready", isReady)
+    if (
+      !api ||
+      !selectedAccount ||
+      !amount ||
+      !relayerFee ||
+      !ethRecipient ||
+      !nonce
+    ) {
+      setError("Please fill in all fields and connect a wallet.");
       return;
     }
 
     setIsLoading(true);
-    setError('');
-    setSuccess('');
+    setError("");
+    setSuccess("");
 
     try {
+      const query = await api.query
       // Log available pallets for debugging
-      console.log("Available pallets:", Object.keys(api.query));
+      console.log("Available pallets:", Object.keys(query));
+      console.log("Bridge pallet",query.bridge, "Etherum bridge: ", query.ethereumBridge )
 
-      const { address, meta: { source } } = selectedAccount;
+      const {
+        address,
+        meta: { source },
+      } = selectedAccount;
       const injector = await web3FromSource(source);
       // TODO: Replace 'bridge' with the correct pallet name (e.g., 'ethereumBridge' or custom)
       // The current pallet name 'bridge' is invalid based on available pallets
-      const extrinsic = api.tx.bridge.lock(amount, relayerFee, ethRecipient, nonce);
+      const extrinsic = api.tx.bridge.lock(
+        amount,
+        relayerFee,
+        ethRecipient,
+        nonce
+      );
 
-      await extrinsic.signAndSend(address, { signer: injector.signer }, ({ status, events }) => {
-        if (status.isInBlock) {
-          setSuccess(`Transaction included in block: ${status.asInBlock}`);
-          onSearchTransaction(status.asInBlock.toString());
-        } else if (status.isFinalized) {
-          let messageId = '';
-          events.forEach(({ event: { data, method, section } }) => {
-            // TODO: Update 'bridge' to match the correct pallet name
-            if (section === 'bridge' && method === 'Locked') {
-              messageId = data[5].toHex();
-            }
-          });
-          setSuccess(`Transaction finalized! Message ID: ${messageId}`);
+      await extrinsic.signAndSend(
+        address,
+        { signer: injector.signer },
+        ({ status, events }) => {
+          if (status.isInBlock) {
+            setSuccess(`Transaction included in block: ${status.asInBlock}`);
+            onSearchTransaction(status.asInBlock.toString());
+          } else if (status.isFinalized) {
+            let messageId = "";
+            events.forEach(({ event: { data, method, section } }) => {
+              // TODO: Update 'bridge' to match the correct pallet name
+              if (section === "bridge" && method === "Locked") {
+                messageId = data[5].toHex();
+              }
+            });
+            setSuccess(`Transaction finalized! Message ID: ${messageId}`);
+          }
         }
-      });
+      );
     } catch (err) {
-      setError('Transaction failed: ' + err.message);
+      setError("Transaction failed: " + err.message);
     } finally {
       setIsLoading(false);
     }
@@ -85,12 +108,16 @@ const BridgeLockForm = ({ onSearchTransaction }) => {
         )}
         {!isConnected && !isConnecting && (
           <Alert variant="destructive" className="mb-4">
-            <AlertDescription>Blockchain node not connected. Please try again later.</AlertDescription>
+            <AlertDescription>
+              Blockchain node not connected. Please try again later.
+            </AlertDescription>
           </Alert>
         )}
         {isConnected && !selectedAccount && (
           <Alert variant="destructive" className="mb-4">
-            <AlertDescription>Please connect a wallet to proceed.</AlertDescription>
+            <AlertDescription>
+              Please connect a wallet to proceed.
+            </AlertDescription>
           </Alert>
         )}
         {isConnected && selectedAccount && (
@@ -98,7 +125,8 @@ const BridgeLockForm = ({ onSearchTransaction }) => {
             <div>
               <h3 className="font-semibold">Selected Account:</h3>
               <p>
-                {selectedAccount.meta.name} ({selectedAccount.address.slice(0, 6)}...)
+                {selectedAccount.meta.name} (
+                {selectedAccount.address.slice(0, 6)}...)
               </p>
             </div>
             <Input
@@ -129,7 +157,9 @@ const BridgeLockForm = ({ onSearchTransaction }) => {
               disabled={isLoading || !api || !selectedAccount || !isConnected}
               className="w-full"
             >
-              {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+              {isLoading ? (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              ) : null}
               Lock Tokens
             </Button>
             {/* <Alert variant="destructive" className="mt-4">
