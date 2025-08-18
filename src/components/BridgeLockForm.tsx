@@ -132,11 +132,11 @@ const BridgeLockForm = ({ onSearchTransaction }) => {
               {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
               Lock Tokens
             </Button>
-            <Alert variant="destructive" className="mt-4">
+            {/* <Alert variant="destructive" className="mt-4">
               <AlertDescription>
                 Warning: The bridge pallet is not found in the node runtime. Please verify the pallet name and node configuration.
               </AlertDescription>
-            </Alert>
+            </Alert> */}
           </div>
         )}
       </CardContent>
