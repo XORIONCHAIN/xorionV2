@@ -15,7 +15,6 @@ import { Menu } from "lucide-react";
 import Footer from "@/components/Footer";
 import AirdropPanel from "@/components/AirdropPanel";
 import { GiSecurityGate, GiTwoCoins } from "react-icons/gi";
-import ConfidentialPanel from "@/components/ConfidentialPanel";
 
 // LAZY LOADED COMPONENTS
 const StakingInterface = lazy(() => import("@/components/StakingInterface"));
@@ -28,6 +27,7 @@ const BridgeLockForm = lazy(() => import("@/components/BridgeLockForm"));
 const BridgeRelayerMonitor = lazy(
   () => import("@/components/BridgeRelayerMonitor")
 );
+const ConfidentialPanel = lazy(() => import("@/components/ConfidentialPanel"));
 
 const NavigationBar = ({ tabs, activeTab, setActiveTab }) => {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
