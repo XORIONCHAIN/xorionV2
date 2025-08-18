@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { web3FromSource } from '@polkadot/extension-dapp';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -19,22 +19,6 @@ const BridgeLockForm = ({ onSearchTransaction }) => {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
 
-  // Fetch relayer fee automatically
-  useEffect(() => {
-    const fetchRelayerFee = async () => {
-      if (!api || !isConnected) return;
-      try {
-        // Assuming the bridge pallet has a storage item called `minimumRelayerFee`
-        const minFee = await api.query.bridge.minimumRelayerFee();
-        const feeValue = minFee.toString();
-        setRelayerFee(feeValue);
-      } catch (err) {
-        setError('Failed to fetch relayer fee: ' + err.message);
-      }
-    };
-    fetchRelayerFee();
-  }, [api, isConnected]);
-
   // Lock tokens function
   const lockTokens = async () => {
     if (!api || !selectedAccount || !amount || !relayerFee || !ethRecipient || !nonce) {
@@ -47,8 +31,13 @@ const BridgeLockForm = ({ onSearchTransaction }) => {
     setSuccess('');
 
     try {
+      // Log available pallets for debugging
+      console.log("Available pallets:", Object.keys(api.query));
+
       const { address, meta: { source } } = selectedAccount;
       const injector = await web3FromSource(source);
+      // TODO: Replace 'bridge' with the correct pallet name (e.g., 'ethereumBridge' or custom)
+      // The current pallet name 'bridge' is invalid based on available pallets
       const extrinsic = api.tx.bridge.lock(amount, relayerFee, ethRecipient, nonce);
 
       await extrinsic.signAndSend(address, { signer: injector.signer }, ({ status, events }) => {
@@ -58,6 +47,7 @@ const BridgeLockForm = ({ onSearchTransaction }) => {
         } else if (status.isFinalized) {
           let messageId = '';
           events.forEach(({ event: { data, method, section } }) => {
+            // TODO: Update 'bridge' to match the correct pallet name
             if (section === 'bridge' && method === 'Locked') {
               messageId = data[5].toHex();
             }
@@ -119,9 +109,9 @@ const BridgeLockForm = ({ onSearchTransaction }) => {
             />
             <Input
               type="number"
-              placeholder="Relayer fee"
+              placeholder="Relayer fee (tip for block producers)"
               value={relayerFee}
-              onChange={(e) => setRelayerFee(e.target.value)} // Allow override
+              onChange={(e) => setRelayerFee(e.target.value)}
             />
             <Input
               placeholder="Ethereum recipient (0x...)"
@@ -142,6 +132,11 @@ const BridgeLockForm = ({ onSearchTransaction }) => {
               {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
               Lock Tokens
             </Button>
+            <Alert variant="destructive" className="mt-4">
+              <AlertDescription>
+                Warning: The bridge pallet is not found in the node runtime. Please verify the pallet name and node configuration.
+              </AlertDescription>
+            </Alert>
           </div>
         )}
       </CardContent>
