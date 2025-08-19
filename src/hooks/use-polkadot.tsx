@@ -1,9 +1,9 @@
-import { ApiPromise, WsProvider } from '@polkadot/api';
-import { useState, useEffect } from 'react';
+import { ApiPromise, WsProvider } from "@polkadot/api";
+import { useState, useEffect } from "react";
 
 interface ConnectionState {
   api: ApiPromise | null;
-  status: 'disconnected' | 'connecting' | 'connected' | 'degraded' | 'error';
+  status: "disconnected" | "connecting" | "connected" | "degraded" | "error";
   lastError: string | null;
   latency: number | null;
   connectionAttempts: number;
@@ -18,12 +18,12 @@ class PersistentPolkadotApi {
   private provider: WsProvider | null = null;
   private state: ConnectionState = {
     api: null,
-    status: 'disconnected',
+    status: "disconnected",
     lastError: null,
     latency: null,
     connectionAttempts: 0,
     lastSuccessfulConnection: null,
-    endpoint: null
+    endpoint: null,
   };
   private listeners: Array<(state: ConnectionState) => void> = [];
   private healthCheckInterval: NodeJS.Timeout | null = null;
@@ -34,15 +34,16 @@ class PersistentPolkadotApi {
   private retryDelay = 2000;
   private maxLatency = 1000;
 
-  private constructor(endpoints: string[] = (
-    import.meta.env.VITE_POLKADOT_ENDPOINTS
-      ? import.meta.env.VITE_POLKADOT_ENDPOINTS.split(',')
+  private constructor(
+    endpoints: string[] = import.meta.env.VITE_POLKADOT_ENDPOINTS
+      ? import.meta.env.VITE_POLKADOT_ENDPOINTS.split(",")
       : [
-        'wss://rpc.polkadot.io',
-        'wss://polkadot.api.onfinality.io/public-ws',
-        'wss://polkadot-rpc.dwellir.com'
-      ]
-  )) {
+          "wss://node01.xorion.network",
+          "wss://rpc.polkadot.io",
+          "wss://polkadot.api.onfinality.io/public-ws",
+          "wss://polkadot-rpc.dwellir.com",
+        ]
+  ) {
     this.endpoints = endpoints;
     this.setupHealthMonitoring();
     this.connect();
@@ -61,23 +62,23 @@ class PersistentPolkadotApi {
   }
 
   private notifyListeners() {
-    this.listeners.forEach(listener => listener(this.state));
+    this.listeners.forEach((listener) => listener(this.state));
   }
 
   subscribe(listener: (state: ConnectionState) => void): () => void {
     this.listeners.push(listener);
     listener(this.state);
     return () => {
-      this.listeners = this.listeners.filter(l => l !== listener);
+      this.listeners = this.listeners.filter((l) => l !== listener);
     };
   }
 
   private async connect() {
-    if (this.state.status === 'connecting') return;
+    if (this.state.status === "connecting") return;
 
     this.updateState({
-      status: 'connecting',
-      connectionAttempts: this.state.connectionAttempts + 1
+      status: "connecting",
+      connectionAttempts: this.state.connectionAttempts + 1,
     });
 
     try {
@@ -90,21 +91,21 @@ class PersistentPolkadotApi {
       this.provider = new WsProvider(endpoint, this.connectionTimeout);
 
       // SETUP PROVIDER EVENT HANDLERS
-      this.provider.on('connected', () => this.handleConnected());
-      this.provider.on('disconnected', () => this.handleDisconnected());
-      this.provider.on('error', (error: Error) => this.handleError(error));
+      this.provider.on("connected", () => this.handleConnected());
+      this.provider.on("disconnected", () => this.handleDisconnected());
+      this.provider.on("error", (error: Error) => this.handleError(error));
 
       this.api = await ApiPromise.create({
         provider: this.provider,
         throwOnConnect: false,
         noInitWarn: true,
-        initWasm: false
+        initWasm: false,
       });
 
       // SETUP API EVENT HANDLERS
-      this.api.on('connected', () => this.handleConnected());
-      this.api.on('disconnected', () => this.handleDisconnected());
-      this.api.on('error', (error: Error) => this.handleError(error));
+      this.api.on("connected", () => this.handleConnected());
+      this.api.on("disconnected", () => this.handleDisconnected());
+      this.api.on("error", (error: Error) => this.handleError(error));
 
       await this.api.isReady;
 
@@ -112,12 +113,11 @@ class PersistentPolkadotApi {
       await this.api.rpc.system.chain();
 
       this.updateState({
-        status: 'connected',
+        status: "connected",
         api: this.api,
         lastError: null,
-        lastSuccessfulConnection: Date.now()
+        lastSuccessfulConnection: Date.now(),
       });
-
     } catch (error) {
       this.handleError(error as Error);
       this.rotateEndpoint();
@@ -129,9 +129,9 @@ class PersistentPolkadotApi {
     try {
       if (this.api) {
         // Remove event listeners with their handlers
-        this.api.off('connected', this.handleConnected);
-        this.api.off('disconnected', this.handleDisconnected);
-        this.api.off('error', this.handleError);
+        this.api.off("connected", this.handleConnected);
+        this.api.off("disconnected", this.handleDisconnected);
+        this.api.off("error", this.handleError);
         await this.api.disconnect();
       }
 
@@ -140,7 +140,7 @@ class PersistentPolkadotApi {
         this.provider.disconnect();
       }
     } catch (error) {
-      console.error('Disconnection error:', error);
+      console.error("Disconnection error:", error);
     } finally {
       this.api = null;
       this.provider = null;
@@ -148,39 +148,40 @@ class PersistentPolkadotApi {
   }
 
   private handleConnected() {
-    if (this.state.status !== 'connected') {
+    if (this.state.status !== "connected") {
       this.updateState({
-        status: 'connected',
+        status: "connected",
         lastError: null,
-        lastSuccessfulConnection: Date.now()
+        lastSuccessfulConnection: Date.now(),
       });
     }
   }
 
   private handleDisconnected() {
-    if (this.state.status !== 'disconnected') {
-      this.updateState({ status: 'disconnected' });
+    if (this.state.status !== "disconnected") {
+      this.updateState({ status: "disconnected" });
       this.scheduleReconnect();
     }
   }
 
   private handleError(error: Error) {
     this.updateState({
-      status: 'error',
-      lastError: error.message
+      status: "error",
+      lastError: error.message,
     });
     this.scheduleReconnect();
   }
 
   private rotateEndpoint() {
-    this.currentEndpointIndex = (this.currentEndpointIndex + 1) % this.endpoints.length;
+    this.currentEndpointIndex =
+      (this.currentEndpointIndex + 1) % this.endpoints.length;
   }
 
   private scheduleReconnect() {
     if (this.state.connectionAttempts >= this.maxRetries) {
       this.updateState({
-        status: 'error',
-        lastError: 'Max connection attempts reached'
+        status: "error",
+        lastError: "Max connection attempts reached",
       });
       return;
     }
@@ -195,7 +196,12 @@ class PersistentPolkadotApi {
 
   private setupHealthMonitoring() {
     this.healthCheckInterval = setInterval(async () => {
-      if ((this.state.status !== 'connected' && this.state.status !== 'degraded') || !this.api) return;
+      if (
+        (this.state.status !== "connected" &&
+          this.state.status !== "degraded") ||
+        !this.api
+      )
+        return;
 
       try {
         const start = Date.now();
@@ -205,11 +211,14 @@ class PersistentPolkadotApi {
         this.updateState({ latency });
 
         if (latency > this.maxLatency) {
-          if (this.state.status !== 'degraded') {
-            this.updateState({ status: 'degraded' });
+          if (this.state.status !== "degraded") {
+            this.updateState({ status: "degraded" });
           }
-        } else if (latency <= this.maxLatency && this.state.status === 'degraded') {
-          this.updateState({ status: 'connected' });
+        } else if (
+          latency <= this.maxLatency &&
+          this.state.status === "degraded"
+        ) {
+          this.updateState({ status: "connected" });
         }
       } catch (error) {
         this.handleError(error as Error);
@@ -218,25 +227,28 @@ class PersistentPolkadotApi {
   }
 
   async getApi(): Promise<ApiPromise> {
-    if (this.api && this.state.status === 'connected') {
+    if (this.api && this.state.status === "connected") {
       return this.api;
     }
 
     return new Promise((resolve, reject) => {
       const timeout = setTimeout(() => {
         unsubscribe();
-        reject(new Error('Connection timeout'));
+        reject(new Error("Connection timeout"));
       }, 45000);
 
       const unsubscribe = this.subscribe((state) => {
-        if (state.api && state.status === 'connected') {
+        if (state.api && state.status === "connected") {
           clearTimeout(timeout);
           unsubscribe();
           resolve(state.api);
-        } else if (state.status === 'error' && state.connectionAttempts >= this.maxRetries) {
+        } else if (
+          state.status === "error" &&
+          state.connectionAttempts >= this.maxRetries
+        ) {
           clearTimeout(timeout);
           unsubscribe();
-          reject(new Error(state.lastError || 'Connection failed'));
+          reject(new Error(state.lastError || "Connection failed"));
         }
       });
     });
@@ -279,12 +291,12 @@ export function usePolkadot() {
   return {
     ...state,
     api: state.api,
-    isConnected: state.status === 'connected',
-    isConnecting: state.status === 'connecting',
-    isError: state.status === 'error',
-    isDegraded: state.status === 'degraded',
+    isConnected: state.status === "connected",
+    isConnecting: state.status === "connecting",
+    isError: state.status === "error",
+    isDegraded: state.status === "degraded",
     connect: () => createApiManager().getApi(),
-    disconnect: () => createApiManager().destroy()
+    disconnect: () => createApiManager().destroy(),
   };
 }
 

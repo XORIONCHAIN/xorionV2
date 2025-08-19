@@ -21,8 +21,6 @@ const BridgeLockForm = ({ onSearchTransaction }) => {
 
   // Lock tokens function
   const lockTokens = async () => {
-    const isReady = await api.isReady;
-    console.log("Isready", isReady)
     if (
       !api ||
       !selectedAccount ||
@@ -40,19 +38,22 @@ const BridgeLockForm = ({ onSearchTransaction }) => {
     setSuccess("");
 
     try {
-      const query = await api.query
-      // Log available pallets for debugging
-      console.log("Available pallets:", Object.keys(query));
-      console.log("Bridge pallet",query.bridge, "Etherum bridge: ", query.ethereumBridge )
+      const isReady = await api.isReady;
+      console.log("Isready", isReady);
+
+      // Verify the ethereumBridge pallet
+      if (!api.query.ethereumBridge) {
+        throw new Error("ethereumBridge pallet not found in api.query");
+      }
 
       const {
         address,
         meta: { source },
       } = selectedAccount;
       const injector = await web3FromSource(source);
-      // TODO: Replace 'bridge' with the correct pallet name (e.g., 'ethereumBridge' or custom)
-      // The current pallet name 'bridge' is invalid based on available pallets
-      const extrinsic = api.tx.bridge.lock(
+
+      // Use ethereumBridge pallet for the transaction
+      const extrinsic = api.tx.ethereumBridge.lock(
         amount,
         relayerFee,
         ethRecipient,
@@ -69,8 +70,8 @@ const BridgeLockForm = ({ onSearchTransaction }) => {
           } else if (status.isFinalized) {
             let messageId = "";
             events.forEach(({ event: { data, method, section } }) => {
-              // TODO: Update 'bridge' to match the correct pallet name
-              if (section === "bridge" && method === "Locked") {
+              // Update to match ethereumBridge pallet
+              if (section === "ethereumBridge" && method === "Locked") {
                 messageId = data[5].toHex();
               }
             });
@@ -162,11 +163,6 @@ const BridgeLockForm = ({ onSearchTransaction }) => {
               ) : null}
               Lock Tokens
             </Button>
-            {/* <Alert variant="destructive" className="mt-4">
-              <AlertDescription>
-                Warning: The bridge pallet is not found in the node runtime. Please verify the pallet name and node configuration.
-              </AlertDescription>
-            </Alert> */}
           </div>
         )}
       </CardContent>
