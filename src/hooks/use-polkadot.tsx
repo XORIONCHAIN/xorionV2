@@ -39,9 +39,12 @@ class PersistentPolkadotApi {
       ? import.meta.env.VITE_POLKADOT_ENDPOINTS.split(",")
       : [
           "wss://node01.xorion.network",
-          "wss://rpc.polkadot.io",
-          "wss://polkadot.api.onfinality.io/public-ws",
-          "wss://polkadot-rpc.dwellir.com",
+          "wss://node02.xorion.network",
+          "wss://node03.xorion.network",
+          "wss://node04.xorion.network",
+          "wss://node05.xorion.network",
+          "wss://node06.xorion.network",
+          "wss://node07.xorion.network",
         ]
   ) {
     this.endpoints = endpoints;
