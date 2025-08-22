@@ -5,6 +5,7 @@ import { Metadata } from "@polkadot/types";
 import { TypeRegistry } from "@polkadot/types/create";
 import BN from "bn.js";
 import { precompiledMetadata } from "../metadata";
+import { QueryClient } from "@tanstack/react-query";
 
 // BALANCE FORMATTING UTILITY
 const formatTxor = (rawBalance: string, decimals = 18): string => {
@@ -136,10 +137,6 @@ interface PolkadotStore {
   isLoading: boolean;
   isFetching: boolean;
 
-  // CACHE
-  lastFetchTime: number;
-  cacheTTL: number;
-
   // ACTIONS
   setApiState: (state: Partial<ApiState>) => void;
   setApi: (api: ApiPromise | null) => void;
@@ -168,12 +165,6 @@ interface PolkadotStore {
   refreshData: () => Promise<void>;
   refreshTransactionData: () => Promise<void>;
 
-  // CACHING
-  cache: Map<string, { data: any; timestamp: number; ttl: number }>;
-  getCached: (key: string) => any | null;
-  setCached: (key: string, data: any, ttl?: number) => void;
-  clearCache: () => void;
-
   // NETWORK DATA (CACHED)
   networkData: any | null;
   setNetworkData: (data: any) => void;
@@ -182,10 +173,12 @@ interface PolkadotStore {
   // VALIDATORS
   validators: ValidatorInfo[];
   fetchValidators: () => Promise<void>;
+
+  // TANSTACK QUERY CLIENT
+  queryClient: QueryClient;
 }
 
-// // WEBSOCKET ENDPOINTS
-// const ENDPOINTS = [import.meta.env.VITE_XORION_WS || "ws://3.219.48.230:9944"];
+// WEBSOCKET ENDPOINTS
 const ENDPOINTS = import.meta.env.VITE_POLKADOT_ENDPOINTS.split(",");
 
 const DEFAULT_METRICS: NetworkMetrics = {
@@ -201,7 +194,6 @@ const DEFAULT_METRICS: NetworkMetrics = {
 };
 
 // TIMEOUT CONSTANTS
-const CACHE_TTL = 30000;
 const CONNECTION_TIMEOUT = 30000;
 const MAX_RETRIES = 5;
 const INITIAL_RETRY_DELAY = 2000; // 2 seconds
@@ -247,11 +239,9 @@ export const usePolkadotStore = create<PolkadotStore>()(
     detailsError: null,
     isLoading: true,
     isFetching: false,
-    lastFetchTime: 0,
-    cacheTTL: CACHE_TTL,
-    cache: new Map(),
     networkData: null,
     validators: [],
+    queryClient: new QueryClient(),
 
     // State Setters
     setApiState: (updates) =>
@@ -414,7 +404,7 @@ export const usePolkadotStore = create<PolkadotStore>()(
       await get().connect(endpoint || undefined);
     },
 
-    // Enhanced data fetching with better error handling
+    // Enhanced data fetching with TanStack Query
     fetchNetworkData: async () => {
       const {
         api,
@@ -423,9 +413,8 @@ export const usePolkadotStore = create<PolkadotStore>()(
         setChartData,
         setStakingData,
         setFetching,
-        getCached,
-        setCached,
         setApiState,
+        queryClient,
       } = get();
 
       if (!api || apiState.status !== "connected") {
@@ -436,45 +425,40 @@ export const usePolkadotStore = create<PolkadotStore>()(
       setFetching(true);
 
       try {
-        // Check cache first
-        const cachedData = getCached("networkData");
-        if (cachedData) {
-          setNetworkMetrics(cachedData.metrics);
-          setChartData(cachedData.chartData);
-          setStakingData(cachedData.stakingData);
-          setFetching(false);
-          return;
-        }
+        const result = await queryClient.fetchQuery({
+          queryKey: ["networkData"],
+          queryFn: async () => {
+            // Fetch with timeout
+            const dataPromise = fetchNetworkDataWithTimeout(api);
+            const timeoutPromise = new Promise((_, reject) =>
+              setTimeout(
+                () => reject(new Error("Network data fetch timeout")),
+                30000
+              )
+            );
 
-        // Fetch with timeout
-        const dataPromise = fetchNetworkDataWithTimeout(api);
-        const timeoutPromise = new Promise((_, reject) =>
-          setTimeout(
-            () => reject(new Error("Network data fetch timeout")),
-            30000
-          )
-        );
-
-        const result = await Promise.race([dataPromise, timeoutPromise]);
+            return await Promise.race([dataPromise, timeoutPromise]);
+          },
+          staleTime: 30000,
+          gcTime: 30000,
+          retry: 3,
+        });
 
         if (result) {
           const { metrics, chartData, stakingData } = result as any;
           setNetworkMetrics(metrics);
           setChartData(chartData);
           setStakingData(stakingData);
-
-          setCached("networkData", { metrics, chartData, stakingData }, 30000);
         }
-
-        setFetching(false);
       } catch (error: any) {
         console.error("❌ Network data fetch failed:", error);
         setApiState({ lastError: error.message });
+      } finally {
         setFetching(false);
       }
     },
 
-    // FIXED: Enhanced transaction data fetching with proper transfer detection
+    // FIXED: Enhanced transaction data fetching with TanStack Query
     fetchTransactionData: async () => {
       const {
         api,
@@ -482,8 +466,7 @@ export const usePolkadotStore = create<PolkadotStore>()(
         setTransactionData,
         setTransactionLoading,
         setTransactionFetching,
-        getCached,
-        setCached,
+        queryClient,
       } = get();
       console.log(
         "Endpoint is: ",
@@ -503,18 +486,15 @@ export const usePolkadotStore = create<PolkadotStore>()(
       setTransactionFetching(true);
 
       try {
-        const cachedData = getCached("transactionData");
-        console.log("Getting cached data ", cachedData);
-        if (cachedData) {
-          setTransactionData(cachedData);
-          setTransactionLoading(false);
-          setTransactionFetching(false);
-          return;
-        }
-        const transactionData = await fetchEnhancedTransactionData(api);
+        const transactionData = await queryClient.fetchQuery({
+          queryKey: ["transactionData"],
+          queryFn: () => fetchEnhancedTransactionData(api),
+          staleTime: 15000,
+          gcTime: 15000,
+          retry: 3,
+        });
 
         setTransactionData(transactionData);
-        setCached("transactionData", transactionData, 15000);
       } catch (error: any) {
         console.error("❌ Transaction data fetch failed:", error);
         setTransactionData({
@@ -528,7 +508,7 @@ export const usePolkadotStore = create<PolkadotStore>()(
       }
     },
 
-    // FIXED: Enhanced transaction details with proper event parsing
+    // FIXED: Enhanced transaction details with TanStack Query
     fetchTransactionDetails: async (hash: string) => {
       const {
         api,
@@ -536,8 +516,7 @@ export const usePolkadotStore = create<PolkadotStore>()(
         setTransactionDetails,
         setDetailsLoading,
         setDetailsError,
-        getCached,
-        setCached,
+        queryClient,
       } = get();
 
       if (!api || apiState.status !== "connected") {
@@ -549,20 +528,16 @@ export const usePolkadotStore = create<PolkadotStore>()(
       setDetailsError(null);
 
       try {
-        const cacheKey = `txDetails_${hash}`;
-        const cachedData = getCached(cacheKey);
-        if (cachedData) {
-          setTransactionDetails(cachedData);
-          setDetailsLoading(false);
-          return;
-        }
-
-        // Enhanced transaction lookup
-        const transactionDetails = await findTransactionByHash(api, hash);
+        const transactionDetails = await queryClient.fetchQuery({
+          queryKey: ["txDetails", hash],
+          queryFn: () => findTransactionByHash(api, hash),
+          staleTime: 60000,
+          gcTime: 60000,
+          retry: 3,
+        });
 
         if (transactionDetails) {
           setTransactionDetails(transactionDetails);
-          setCached(cacheKey, transactionDetails, 60000);
         } else {
           setDetailsError("Transaction not found");
         }
@@ -575,95 +550,75 @@ export const usePolkadotStore = create<PolkadotStore>()(
     },
 
     refreshData: async () => {
-      const { clearCache, fetchNetworkData, setNetworkMetrics } = get();
-      clearCache();
+      const { queryClient, fetchNetworkData, setNetworkMetrics } = get();
+      await queryClient.invalidateQueries({ queryKey: ["networkData"] });
       setNetworkMetrics({ lastUpdated: 0 });
       await fetchNetworkData();
     },
 
     refreshTransactionData: async () => {
-      const { clearCache, fetchTransactionData, setTransactionData } = get();
-      clearCache();
+      const { queryClient, fetchTransactionData, setTransactionData } = get();
+      await queryClient.invalidateQueries({ queryKey: ["transactionData"] });
       setTransactionData({ transactions: [], blocks: [], lastUpdated: 0 });
       await fetchTransactionData();
-    },
-
-    // Enhanced caching
-    getCached: (key: string) => {
-      const { cache } = get();
-      const cached = cache.get(key);
-
-      if (!cached) return null;
-
-      const now = Date.now();
-      if (now - cached.timestamp > cached.ttl) {
-        cache.delete(key);
-        return null;
-      }
-
-      return cached.data;
-    },
-
-    setCached: (key: string, data: any, ttl: number = CACHE_TTL) => {
-      const { cache } = get();
-      cache.set(key, {
-        data,
-        timestamp: Date.now(),
-        ttl,
-      });
-    },
-
-    clearCache: () => {
-      set({ cache: new Map() });
     },
 
     setNetworkData: (data: any) => set({ networkData: data }),
     clearNetworkData: () => set({ networkData: null }),
 
-    // Enhanced validators fetching
+    // Enhanced validators fetching with TanStack Query
     fetchValidators: async () => {
-      const { api, apiState } = get();
+      const { api, apiState, queryClient } = get();
       if (!api || apiState.status !== "connected") return;
 
       try {
-        const validatorAddresses = await api.query.session.validators();
-        const validatorInfos: ValidatorInfo[] = await Promise.all(
-          (validatorAddresses as unknown as any[])
-            .slice(0, 10)
-            .map(async (addressCodec: any) => {
-              const address = addressCodec.toString();
+        const validatorInfos = await queryClient.fetchQuery({
+          queryKey: ["validators"],
+          queryFn: async () => {
+            const validatorAddresses = await api.query.session.validators();
+            return await Promise.all(
+              (validatorAddresses as unknown as any[])
+                .slice(0, 10)
+                .map(async (addressCodec: any) => {
+                  const address = addressCodec.toString();
 
-              try {
-                const [prefs, ledger] = await Promise.all([
-                  api.query.staking.validators(address),
-                  api.query.staking.ledger(address),
-                ]);
+                  try {
+                    const [prefs, ledger] = await Promise.all([
+                      api.query.staking.validators(address),
+                      api.query.staking.ledger(address),
+                    ]);
 
-                const commission = (prefs as any).commission.toNumber() / 1e7;
-                const selfBonded = (ledger as any).isSome
-                  ? (ledger as any).unwrap().active.toString()
-                  : "0";
+                    const commission =
+                      (prefs as any).commission.toNumber() / 1e7;
+                    const selfBonded = (ledger as any).isSome
+                      ? (ledger as any).unwrap().active.toString()
+                      : "0";
 
-                return {
-                  address,
-                  commission,
-                  selfBonded,
-                  nominators: 0, // Simplified
-                  totalStake: "0", // Simplified
-                  status: "active",
-                };
-              } catch {
-                return {
-                  address,
-                  commission: 0,
-                  selfBonded: "0",
-                  nominators: 0,
-                  totalStake: "0",
-                  status: "unknown",
-                };
-              }
-            })
-        );
+                    return {
+                      address,
+                      commission,
+                      selfBonded,
+                      nominators: 0, // Simplified
+                      totalStake: "0", // Simplified
+                      status: "active",
+                    };
+                  } catch {
+                    return {
+                      address,
+                      commission: 0,
+                      selfBonded: "0",
+                      nominators: 0,
+                      totalStake: "0",
+                      status: "unknown",
+                    };
+                  }
+                })
+            );
+          },
+          staleTime: 30000,
+          gcTime: 30000,
+          retry: 3,
+        });
 
         set({ validators: validatorInfos });
       } catch (error) {
