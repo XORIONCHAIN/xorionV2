@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { FaShieldAlt } from 'react-icons/fa';
@@ -34,7 +34,7 @@ interface UserStakingInfo {
     amount: string;
     rewards: string;
   }>;
-  unbonding: Array<{ value: string; era: number }>;
+  unbonding: Array<{ value: string; era: number; unlockAt: number }>;
   totalUnbonding: string;
 }
 
@@ -137,6 +137,8 @@ const StakingInterface = () => {
   const [isInitialLoad, setIsInitialLoad] = useState(true);
 
   const apiConnected = !!api && apiState.status === 'connected';
+  const queryClient = useQueryClient();
+
 
   // Initialize wallet extension
   useEffect(() => {
@@ -256,6 +258,12 @@ const StakingInterface = () => {
         let totalUnbonding = new BN(0);
         let delegations: UserStakingInfo['delegations'] = [];
 
+        const activeEra = (await api.query.staking.activeEra()).unwrap().index.toNumber();
+        const eraLength = api.consts.staking.sessionsPerEra.mul(api.consts.babe.epochDuration)
+                                                          .toNumber();
+        const blockTime = api.consts.babe.expectedBlockTime.toNumber();
+        const eraDurationMs = eraLength * blockTime;
+
         const bondedResult = await api.query.staking.bonded(selectedAccount.address);
         if (bondedResult && !bondedResult.isEmpty) {
           isAccountBonded = true;
@@ -271,6 +279,17 @@ const StakingInterface = () => {
               value: chunk.value.toString(),
               era: Number(chunk.era.toString()),
             }));
+            unbonding = ledger.unlocking.map((chunk: any) => {
+          const era = Number(chunk.era.toString());
+          const remainingEras = era - activeEra;
+          const unlockTimeMs = Date.now() + remainingEras * eraDurationMs;
+
+          return {
+            value: chunk.value.toString(),
+            era,
+            unlockAt: unlockTimeMs, 
+          };
+        });
             totalUnbonding = unbonding.reduce(
               (sum, chunk) => sum.add(new BN(chunk.value)),
               new BN(0)
@@ -316,6 +335,29 @@ const StakingInterface = () => {
     },
     enabled: apiConnected && !!selectedAccount,
   });
+
+
+  const countDown = (targetTime: number) =>{
+  const [timeLeft, setTimeLeft] = useState(targetTime - Date.now());
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setTimeLeft(targetTime - Date.now());
+    }, 1000);
+
+    return () => clearInterval(timer);
+  }, [targetTime]);
+
+  if (timeLeft <= 0) return "Unlocked";
+
+  const seconds = Math.floor((timeLeft / 1000) % 60);
+  const minutes = Math.floor((timeLeft / (1000 * 60)) % 60);
+  const hours = Math.floor((timeLeft / (1000 * 60 * 60)) % 24);
+  const days = Math.floor(timeLeft / (1000 * 60 * 60 * 24));
+
+  return `${days}d ${hours}h ${minutes}m ${seconds}s`;
+}
+
 
   // Update state when query data changes
   useEffect(() => {
@@ -381,7 +423,8 @@ const StakingInterface = () => {
                       </div>
                       <div className="flex items-center space-x-2 text-sm text-muted-foreground">
                         <CalendarIcon className="h-4 w-4" />
-                        <span>Unlocks at era {chunk.era}</span>
+                        {/* <span>Unlocks at era {chunk.era}</span> */}
+                        <span>{countDown(chunk.unlockAt)}</span>
                       </div>
                     </div>
                   ))}
@@ -412,7 +455,7 @@ const StakingInterface = () => {
         tx.signAndSend(
           selectedAccount.address,
           { signer: injector.signer },
-          ({ status, dispatchError, events }: any) => {
+        async  ({ status, dispatchError, events }: any) => {
             if (status.isFinalized) {
               if (dispatchError) {
                 let errorMessage = 'Transaction failed';
@@ -433,6 +476,10 @@ const StakingInterface = () => {
                   title: "Success!",
                   description: successMessage,
                 });
+                 await Promise.all([
+                  queryClient.invalidateQueries({ queryKey: ["balance"] }),
+                  queryClient.invalidateQueries({ queryKey: ["userStaking"] }),
+                ]);
                 onSuccess?.();
                 resolve(true);
               }
