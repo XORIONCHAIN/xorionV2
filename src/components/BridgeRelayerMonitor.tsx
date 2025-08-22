@@ -46,9 +46,12 @@ const BridgeRelayerMonitor = () => {
                 }
 
                 // Fetch relayerFund
-                const relayerFund = await query.ethereumBridge.relayerFund();
+                const relayerFund = await query.ethereumBridge.relayers();
+                console.log('relay fund: ', relayerFund)
                 console.log("relayerFund:", relayerFund.toHuman());
-                setRelayers([relayerFund.toHuman()]);
+                const allRelayers = relayerFund.toHuman() as string[]
+                setRelayers(allRelayers);
+
 
                 // Fetch paused status (optional)
                 const isPausedValue = await query.ethereumBridge.paused?.();

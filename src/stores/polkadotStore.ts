@@ -199,6 +199,8 @@ const DEFAULT_METRICS: NetworkMetrics = {
   lastUpdated: 0,
 };
 
+console.log(ENDPOINTS)
+
 // TIMEOUT CONSTANTS
 const CACHE_TTL = 30000;
 const CONNECTION_TIMEOUT = 30000;
