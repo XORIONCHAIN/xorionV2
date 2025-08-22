@@ -8,7 +8,13 @@ import { usePolkadot } from "@/hooks/use-polkadot";
 
 const ConfidentialPanel: React.FC = () => {
   const { selectedAccount } = useWallet();
-  const { api: polkadotApi } = usePolkadot();
+  const { api: polkadotApi, forceReconnect, status } = usePolkadot();
+  useEffect(() => {
+    if (["error", "disconnected"].includes(status)) {
+      const timer = setTimeout(() => forceReconnect(), 30000);
+      return () => clearTimeout(timer);
+    }
+  }, [status, forceReconnect]);
   const [api, setApi] = useState<ApiPromise | null>(null);
   const [state, setState] = useState({
     deposit: {

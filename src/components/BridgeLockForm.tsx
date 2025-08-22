@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { web3FromSource } from "@polkadot/extension-dapp";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -15,7 +15,8 @@ const BridgeLockForm = ({
 }: {
   onSearchTransaction: (blockHash: string) => void;
 }) => {
-  const { api, isConnected, isConnecting } = usePolkadot();
+  const { api, isConnected, isConnecting, forceReconnect, status, lastError } =
+    usePolkadot();
   const { selectedAccount } = useWallet();
   const [amount, setAmount] = useState<string>("");
   const [relayerFee, setRelayerFee] = useState<string>("");
@@ -38,7 +39,12 @@ const BridgeLockForm = ({
       throw new Error("Invalid amount format");
     }
   };
-
+  useEffect(() => {
+    if (["error", "disconnected"].includes(status)) {
+      const timer = setTimeout(() => forceReconnect(), 30000);
+      return () => clearTimeout(timer);
+    }
+  }, [status, forceReconnect]);
   // Validate and convert hex string to [u8; 32]
   const toMessageId = (hex: string): Uint8Array => {
     const cleanHex = hex.startsWith("0x") ? hex.slice(2) : hex;
