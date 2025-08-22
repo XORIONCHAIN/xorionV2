@@ -193,6 +193,8 @@ const DEFAULT_METRICS: NetworkMetrics = {
   lastUpdated: 0,
 };
 
+console.log(ENDPOINTS)
+
 // TIMEOUT CONSTANTS
 const CONNECTION_TIMEOUT = 30000;
 const MAX_RETRIES = 5;

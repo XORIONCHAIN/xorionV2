@@ -14,6 +14,10 @@ import StakingOverview from './StakingOverview';
 import StakingActions from './StakingActions';
 import DelegationDistributionChart from './DelegationDistributionChart';
 import { LockIcon, CircleDashedIcon, ListIcon, CircleIcon, CalendarIcon, LockOpenIcon } from 'lucide-react';
+import { useCountdown } from "@/hooks/useCountdown";
+import type { Option} from '@polkadot/types';
+import type { StakingLedger  } from '@polkadot/types/interfaces';
+
 
 // Types
 interface Validator {
@@ -135,7 +139,7 @@ const StakingInterface = () => {
   const [isBonded, setIsBonded] = useState(false);
   const [stakingError, setStakingError] = useState<string | null>(null);
   const [isInitialLoad, setIsInitialLoad] = useState(true);
-
+  
   const apiConnected = !!api && apiState.status === 'connected';
   const queryClient = useQueryClient();
 
@@ -161,6 +165,7 @@ const StakingInterface = () => {
     };
     initWallet();
   }, [toast]);
+
 
   // Fetch balance using TanStack Query
   const { data: balance = "0" } = useQuery({
@@ -259,6 +264,7 @@ const StakingInterface = () => {
         let delegations: UserStakingInfo['delegations'] = [];
 
         const activeEra = (await api.query.staking.activeEra()).unwrap().index.toNumber();
+        const activeEraInfo = (await api.query.staking.activeEra()).unwrap()
         const eraLength = api.consts.staking.sessionsPerEra.mul(api.consts.babe.epochDuration)
                                                           .toNumber();
         const blockTime = api.consts.babe.expectedBlockTime.toNumber();
@@ -271,19 +277,17 @@ const StakingInterface = () => {
         }
 
         if (controller) {
-          const ledgerResult = await api.query.staking.ledger(controller);
+          const ledgerResult = await api.query.staking.ledger(controller)  as Option<StakingLedger>;
           if (ledgerResult && !ledgerResult.isEmpty) {
             const ledger = ledgerResult.unwrap();
             totalStaked = ledger.active.toString();
-            unbonding = ledger.unlocking.map((chunk: any) => ({
-              value: chunk.value.toString(),
-              era: Number(chunk.era.toString()),
-            }));
+
             unbonding = ledger.unlocking.map((chunk: any) => {
           const era = Number(chunk.era.toString());
           const remainingEras = era - activeEra;
-          const unlockTimeMs = Date.now() + remainingEras * eraDurationMs;
-
+          const activeEraStartMs = activeEraInfo.start.unwrap().toNumber()
+          const unlockTimeMs = activeEraStartMs+ remainingEras * eraDurationMs;
+            
           return {
             value: chunk.value.toString(),
             era,
@@ -337,28 +341,6 @@ const StakingInterface = () => {
   });
 
 
-  const countDown = (targetTime: number) =>{
-  const [timeLeft, setTimeLeft] = useState(targetTime - Date.now());
-
-  useEffect(() => {
-    const timer = setInterval(() => {
-      setTimeLeft(targetTime - Date.now());
-    }, 1000);
-
-    return () => clearInterval(timer);
-  }, [targetTime]);
-
-  if (timeLeft <= 0) return "Unlocked";
-
-  const seconds = Math.floor((timeLeft / 1000) % 60);
-  const minutes = Math.floor((timeLeft / (1000 * 60)) % 60);
-  const hours = Math.floor((timeLeft / (1000 * 60 * 60)) % 24);
-  const days = Math.floor(timeLeft / (1000 * 60 * 60 * 24));
-
-  return `${days}d ${hours}h ${minutes}m ${seconds}s`;
-}
-
-
   // Update state when query data changes
   useEffect(() => {
     if (fetchedValidators) {
@@ -381,36 +363,40 @@ const StakingInterface = () => {
     }
   }, [userStakingData]);
 
-  const UnbondingSection = () => {
-    return (
-      <Card className="mt-6 bg-card/50 backdrop-blur-sm text-white p-6 rounded-lg shadow-lg border border-white/10">
-        <CardHeader className="pb-4">
-          <div className="flex items-center space-x-3">
-            <LockIcon className="h-6 w-6 text-blue-400" />
-            <CardTitle className="text-xl font-semibold">Unbonding Funds</CardTitle>
-          </div>
-        </CardHeader>
-        <CardContent>
-          {userStaking.unbonding.length > 0 ? (
-            <div className="space-y-6">
-              <div className="bg-white/5 p-4 rounded-lg border border-white/5">
-                <div className="flex items-center space-x-2 text-blue-300">
-                  <CircleDashedIcon className="h-5 w-5" />
-                  <p className="text-lg font-medium">
-                    Total Unbonding:{" "}
-                    <span className="font-bold text-white">
-                      {formatBalanceForDisplay(userStaking.totalUnbonding, 18)} XOR
-                    </span>
-                  </p>
-                </div>
+const UnbondingSection = () => {
+  return (
+    <Card className="mt-6 bg-card/50 backdrop-blur-sm text-white p-6 rounded-lg shadow-lg border border-white/10">
+      <CardHeader className="pb-4">
+        <div className="flex items-center space-x-3">
+          <LockIcon className="h-6 w-6 text-blue-400" />
+          <CardTitle className="text-xl font-semibold">Unbonding Funds</CardTitle>
+        </div>
+      </CardHeader>
+      <CardContent>
+        {userStaking.unbonding.length > 0 ? (
+          <div className="space-y-6">
+            <div className="bg-white/5 p-4 rounded-lg border border-white/5">
+              <div className="flex items-center space-x-2 text-blue-300">
+                <CircleDashedIcon className="h-5 w-5" />
+                <p className="text-lg font-medium">
+                  Total Unbonding:{" "}
+                  <span className="font-bold text-white">
+                    {formatBalanceForDisplay(userStaking.totalUnbonding, 18)} XOR
+                  </span>
+                </p>
               </div>
-              <div>
-                <div className="flex items-center space-x-2 mb-3 text-muted-foreground">
-                  <ListIcon className="h-5 w-5" />
-                  <h3 className="text-md font-medium">Unbonding Chunks</h3>
-                </div>
-                <div className="space-y-3">
-                  {userStaking.unbonding.map((chunk, index) => (
+            </div>
+            <div>
+              <div className="flex items-center space-x-2 mb-3 text-muted-foreground">
+                <ListIcon className="h-5 w-5" />
+                <h3 className="text-md font-medium">Unbonding Chunks</h3>
+              </div>
+              <div className="space-y-3">
+                {userStaking.unbonding.map((chunk, index) => {
+                  // console.log('unl: ', chunk)
+                  const { days, hours, minutes, seconds, isExpired } = useCountdown(chunk.unlockAt);
+
+                  return (
                     <div
                       key={index}
                       className="flex justify-between items-center bg-white/5 p-3 rounded-lg border border-white/5 hover:bg-white/10 transition-colors"
@@ -423,27 +409,32 @@ const StakingInterface = () => {
                       </div>
                       <div className="flex items-center space-x-2 text-sm text-muted-foreground">
                         <CalendarIcon className="h-4 w-4" />
-                        {/* <span>Unlocks at era {chunk.era}</span> */}
-                        <span>{countDown(chunk.unlockAt)}</span>
+                        <span>
+                          {isExpired
+                            ? "Unlocked"
+                            : `${days}d ${hours}h ${minutes}m ${seconds}s`}
+                        </span>
                       </div>
                     </div>
-                  ))}
-                </div>
+                  );
+                })}
               </div>
             </div>
-          ) : (
-            <div className="flex flex-col items-center justify-center py-8 text-center">
-              <LockOpenIcon className="h-10 w-10 text-muted-foreground mb-3" />
-              <p className="text-muted-foreground">No funds currently unbonding</p>
-              <p className="text-sm text-muted-foreground/70 mt-1">
-                Funds will appear here when unbonding
-              </p>
-            </div>
-          )}
-        </CardContent>
-      </Card>
-    );
-  };
+          </div>
+        ) : (
+          <div className="flex flex-col items-center justify-center py-8 text-center">
+            <LockOpenIcon className="h-10 w-10 text-muted-foreground mb-3" />
+            <p className="text-muted-foreground">No funds currently unbonding</p>
+            <p className="text-sm text-muted-foreground/70 mt-1">
+              Funds will appear here when unbonding
+            </p>
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+};
+
 
   // Helper function to execute transactions with proper error handling
   const executeTransaction = async (tx: any, successMessage: string, onSuccess?: () => void): Promise<boolean> => {

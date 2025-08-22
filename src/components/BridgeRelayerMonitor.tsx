@@ -46,9 +46,12 @@ const BridgeRelayerMonitor = () => {
         // Validate and cast to boolean
         setIsPaused(typeof isPausedPrimitive === "boolean" ? isPausedPrimitive : false);
 
-        // Fetch total locked
-        const totalLockedData = await api.query.ethereumBridge.totalLocked();
-        setTotalLocked(totalLockedData.toString()); // Store as string to handle large numbers
+                // Fetch relayerFund
+                const relayerFund = await query.ethereumBridge.relayers();
+                console.log('relay fund: ', relayerFund)
+                console.log("relayerFund:", relayerFund.toHuman());
+                const allRelayers = relayerFund.toHuman() as string[]
+                setRelayers(allRelayers);
 
         // Fetch total released
         const totalReleasedData = await api.query.ethereumBridge.totalReleased();
