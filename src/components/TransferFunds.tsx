@@ -38,12 +38,21 @@ interface TransferHistoryItem {
   blockNumber?: number;
 }
 
+interface BalanceFormatterOptions {
+  decimals?: number;
+  symbol?: string;
+}
+
 // TOKEN FORMATTING HELPER
-const formatToken = (amount: string | BN | number, decimals = 18, unit = 'tXOR', decimalsToShow = 6) => {
+const formatToken = (amount: string | BN | number, 
+  decimals = 18, unit = 'tXOR', 
+  decimalsToShow = 6) => {
   if (amount == null) return `0 ${unit}`;
   const divisor = Math.pow(10, decimals);
   const display = Number(amount) / divisor;
-  return `${display.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: decimalsToShow })} ${unit}`;
+  return `${display.toLocaleString(undefined, 
+    { minimumFractionDigits: decimalsToShow, 
+      maximumFractionDigits: decimalsToShow })} ${unit}`;
 };
 
 const TransferFunds = () => {
@@ -493,6 +502,61 @@ const TransferFunds = () => {
 
   const amountValidation = getAmountValidation();
 
+  const useBalanceFormatter = (
+  balance: BN | bigint | number | string,
+  { decimals = 12, symbol = "UNIT" }: BalanceFormatterOptions = {}
+  ): string  => {
+  return useMemo(() => {
+    if (balance === undefined || balance === null) return "--";
+
+    let bnValue: BN;
+
+    if (BN.isBN(balance)) {
+      bnValue = balance;
+    } else if (typeof balance === "bigint") {
+      bnValue = new BN(balance.toString());
+    } else if (typeof balance === "number") {
+      // numbers are safe only if < 2^53
+      bnValue = new BN(balance);
+    } else if (typeof balance === "string") {
+      bnValue = new BN(balance, 10);
+    } else {
+      return "--";
+    }
+
+    return formatBalance(bnValue, {
+      decimals,
+      withSi: true,
+      withUnit: symbol,
+      forceUnit: '-'
+    });
+  }, [balance, decimals, symbol])
+  }
+
+
+  // Example with existential deposit
+const existentialDeposit = useBalanceFormatter(XORION_CHAIN_CONFIG.existentialDeposit, {
+  decimals: 18,
+  symbol: "tXOR",
+});
+
+// Example with a dynamic getter
+const availableVal = useBalanceFormatter(getMaxTransferableAmount(), {
+  decimals: 18,
+  symbol: "tXOR",
+});
+
+const lockedBalanceVal = useBalanceFormatter(lockedBalance, {
+  decimals: 18,
+  symbol: "tXOR",
+});
+
+const balanceVal = useBalanceFormatter(balance, {
+  decimals: 18,
+  symbol: "tXOR",
+});
+
+
   return (
     <div className="min-h-screen glass-card p-4">
       <div className="max-w-6xl mx-auto space-y-6">
@@ -561,17 +625,22 @@ const TransferFunds = () => {
                     <div className="mt-3 p-4 bg-muted/20 rounded-lg space-y-2 text-sm">
                       <div className="flex justify-between text-white">
                         <span>Total Balance:</span>
-                        <span className="font-mono">{formatBalance(balance, { decimals: 18, withUnit: 'tXOR', })}</span>
+                        {/* <span className="font-mono">{formatBalance(balance, { decimals: 18, withUnit: 'tXOR',  withSi: false })}</span> */}
+                        <span className="font-mono">{balanceVal}</span>
                       </div>
                       <div className="flex justify-between text-white">
                         <span>Available:</span>
                         <span className="font-mono text-green-400">
-                          {formatBalance(getMaxTransferableAmount(), { decimals: 18, withUnit: 'tXOR', })}
+                          { availableVal}
                         </span>
+                        {/* <span className="font-mono text-green-400">
+                          {formatBalance(getMaxTransferableAmount(), { decimals: 18, withUnit: 'tXOR',  withSi: false })}
+                        </span> */}
                       </div>
                       <div className="flex justify-between text-white">
                         <span>Locked:</span>
-                        <span className="font-mono text-orange-400">{formatBalance(lockedBalance, { decimals: 18, withUnit: 'tXOR', })}</span>
+                        <span className="font-mono text-orange-400">{ lockedBalanceVal}</span>
+                        {/* <span className="font-mono text-orange-400">{formatBalance(lockedBalance, { decimals: 18, withUnit: 'tXOR',  withSi: false })}</span> */}
                       </div>
                     </div>
                   )}
