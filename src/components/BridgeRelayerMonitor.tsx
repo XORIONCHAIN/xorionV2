@@ -23,39 +23,50 @@ const BridgeRelayerMonitor = () => {
   useEffect(() => {
     const fetchData = async () => {
       if (!api || !isConnected) {
-        setError("API is not initialized or not connected. Check the node endpoint.");
+        setError(
+          "API is not initialized or not connected. Check the node endpoint."
+        );
         setIsLoading(false);
         return;
       }
 
       try {
         await api.isReady;
+        const query = await api.query;
 
         // Fetch relayers
-        const relayersData = await api.query.ethereumBridge.relayers();
+        const relayersData = await query.ethereumBridge.relayers();
         const relayersHuman = relayersData.toHuman();
         // Validate and cast relayers to string[]
         const validatedRelayers = Array.isArray(relayersHuman)
-          ? relayersHuman.filter((item): item is string => typeof item === "string")
+          ? relayersHuman.filter(
+              (item): item is string => typeof item === "string"
+            )
           : [];
         setRelayers(validatedRelayers);
 
         // Fetch paused status
-        const isPausedValue = await api.query.ethereumBridge.paused();
+        const isPausedValue = await query.ethereumBridge.paused();
         const isPausedPrimitive = isPausedValue.toPrimitive();
         // Validate and cast to boolean
-        setIsPaused(typeof isPausedPrimitive === "boolean" ? isPausedPrimitive : false);
+        setIsPaused(
+          typeof isPausedPrimitive === "boolean" ? isPausedPrimitive : false
+        );
 
-                // Fetch relayerFund
-                const relayerFund = await query.ethereumBridge.relayers();
-                console.log('relay fund: ', relayerFund)
-                console.log("relayerFund:", relayerFund.toHuman());
-                const allRelayers = relayerFund.toHuman() as string[]
-                setRelayers(allRelayers);
+        // Fetch relayerFund
+        const relayerFund = await query.ethereumBridge.relayers();
+        console.log("relay fund: ", relayerFund);
+        console.log("relayerFund:", relayerFund.toHuman());
+        const allRelayers = relayerFund.toHuman() as string[];
+        setRelayers(allRelayers);
 
         // Fetch total released
-        const totalReleasedData = await api.query.ethereumBridge.totalReleased();
+
+        const totalReleasedData = await query.ethereumBridge.totalReleased();
         setTotalReleased(totalReleasedData.toString());
+
+        const totalLockedData = await query.ethereumBridge.totalLocked();
+        setTotalLocked(totalLockedData.toString());
 
         setError("");
       } catch (err) {
