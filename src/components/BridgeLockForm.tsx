@@ -8,29 +8,31 @@ import { Loader2 } from "lucide-react";
 import { useWallet } from "./WalletConnection";
 import { usePolkadot } from "@/hooks/use-polkadot";
 
-// Token has 18 decimals
 const TOKEN_DECIMALS = 18;
 
-const BridgeLockForm = ({ onSearchTransaction }: { onSearchTransaction: (blockHash: string) => void }) => {
+const BridgeLockForm = ({
+  onSearchTransaction,
+}: {
+  onSearchTransaction: (blockHash: string) => void;
+}) => {
   const { api, isConnected, isConnecting } = usePolkadot();
   const { selectedAccount } = useWallet();
   const [amount, setAmount] = useState<string>("");
   const [relayerFee, setRelayerFee] = useState<string>("");
   const [ethRecipient, setEthRecipient] = useState<string>("");
   const [releaseAmount, setReleaseAmount] = useState<string>("");
-  const [messageId, setMessageId] = useState<string>("");
-  const [signatures, setSignatures] = useState<string>(""); // New field for signatures
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [error, setError] = useState<string>("");
   const [success, setSuccess] = useState<string>("");
   const [activeTab, setActiveTab] = useState<"lock" | "release">("lock");
 
-  // Convert human-readable amount (e.g., "1.5") to chain units (e.g., 1.5 * 10^18)
   const toChainUnits = (value: string): string => {
     try {
       const num = Number(value);
       if (isNaN(num) || num < 0) throw new Error("Invalid amount");
-      const units = BigInt(Math.floor(num * Math.pow(10, TOKEN_DECIMALS))).toString();
+      const units = BigInt(
+        Math.floor(num * Math.pow(10, TOKEN_DECIMALS))
+      ).toString();
       return units;
     } catch {
       throw new Error("Invalid amount format");
@@ -40,7 +42,8 @@ const BridgeLockForm = ({ onSearchTransaction }: { onSearchTransaction: (blockHa
   // Validate and convert hex string to [u8; 32]
   const toMessageId = (hex: string): Uint8Array => {
     const cleanHex = hex.startsWith("0x") ? hex.slice(2) : hex;
-    if (cleanHex.length !== 64) throw new Error("Message ID must be 32 bytes (64 hex chars)");
+    if (cleanHex.length !== 64)
+      throw new Error("Message ID must be 32 bytes (64 hex chars)");
     const bytes = new Uint8Array(32);
     for (let i = 0; i < 32; i++) {
       bytes[i] = parseInt(cleanHex.slice(i * 2, i * 2 + 2), 16);
@@ -50,10 +53,14 @@ const BridgeLockForm = ({ onSearchTransaction }: { onSearchTransaction: (blockHa
 
   // Validate and convert signatures (comma-separated hex strings, each 65 bytes)
   const toSignatures = (sigInput: string): Uint8Array[] => {
-    const sigs = sigInput.split(",").map((s) => s.trim()).filter((s) => s);
+    const sigs = sigInput
+      .split(",")
+      .map((s) => s.trim())
+      .filter((s) => s);
     return sigs.map((sig) => {
       const cleanSig = sig.startsWith("0x") ? sig.slice(2) : sig;
-      if (cleanSig.length !== 130) throw new Error("Each signature must be 65 bytes (130 hex chars)");
+      if (cleanSig.length !== 130)
+        throw new Error("Each signature must be 65 bytes (130 hex chars)");
       const bytes = new Uint8Array(65);
       for (let i = 0; i < 65; i++) {
         bytes[i] = parseInt(cleanSig.slice(i * 2, i * 2 + 2), 16);
@@ -138,7 +145,7 @@ const BridgeLockForm = ({ onSearchTransaction }: { onSearchTransaction: (blockHa
 
   // Release tokens function
   const releaseTokens = async () => {
-    if (!api || !selectedAccount || !releaseAmount || !messageId || !signatures) {
+    if (!api || !selectedAccount || !releaseAmount) {
       setError("Please fill in release amount, message ID, and signatures.");
       return;
     }
@@ -162,22 +169,17 @@ const BridgeLockForm = ({ onSearchTransaction }: { onSearchTransaction: (blockHa
 
       // Convert inputs
       const amountUnits = toChainUnits(releaseAmount);
-      const messageIdBytes = toMessageId(messageId);
-      const signatureBytes = toSignatures(signatures);
 
-      const extrinsic = api.tx.ethereumBridge.release(
-        messageIdBytes,
-        address, // Use selectedAccount as recipient
-        amountUnits,
-        signatureBytes
-      );
+      const extrinsic = api.tx.ethereumBridge.release(address, amountUnits);
 
       await extrinsic.signAndSend(
         address,
         { signer: injector.signer },
         ({ status, events }) => {
           if (status.isInBlock) {
-            setSuccess(`Release transaction included in block: ${status.asInBlock}`);
+            setSuccess(
+              `Release transaction included in block: ${status.asInBlock}`
+            );
             onSearchTransaction(status.asInBlock.toString());
           } else if (status.isFinalized) {
             let releaseEvent = "";
@@ -186,7 +188,9 @@ const BridgeLockForm = ({ onSearchTransaction }: { onSearchTransaction: (blockHa
                 releaseEvent = data[0].toHex();
               }
             });
-            setSuccess(`Release transaction finalized! Recipient: ${releaseEvent}`);
+            setSuccess(
+              `Release transaction finalized! Recipient: ${releaseEvent}`
+            );
           }
         }
       );
@@ -286,7 +290,9 @@ const BridgeLockForm = ({ onSearchTransaction }: { onSearchTransaction: (blockHa
                 />
                 <Button
                   onClick={lockTokens}
-                  disabled={isLoading || !api || !selectedAccount || !isConnected}
+                  disabled={
+                    isLoading || !api || !selectedAccount || !isConnected
+                  }
                   className="w-full"
                 >
                   {isLoading ? (
@@ -305,19 +311,11 @@ const BridgeLockForm = ({ onSearchTransaction }: { onSearchTransaction: (blockHa
                   onChange={(e) => setReleaseAmount(e.target.value)}
                   step="0.000000000000000001"
                 />
-                <Input
-                  placeholder="Message ID (32-byte hex)"
-                  value={messageId}
-                  onChange={(e) => setMessageId(e.target.value)}
-                />
-                <Input
-                  placeholder="Signatures (comma-separated 65-byte hex)"
-                  value={signatures}
-                  onChange={(e) => setSignatures(e.target.value)}
-                />
                 <Button
                   onClick={releaseTokens}
-                  disabled={isLoading || !api || !selectedAccount || !isConnected}
+                  disabled={
+                    isLoading || !api || !selectedAccount || !isConnected
+                  }
                   className="w-full"
                 >
                   {isLoading ? (
