@@ -30,7 +30,7 @@ class PersistentPolkadotApi {
   private endpoints: string[];
   private currentEndpointIndex = 0;
   private connectionTimeout = 30000;
-  private maxRetries = 5;
+  private maxRetries = 0; // Changed to 0 for infinite retries
   private retryDelay = 2000;
   private maxLatency = 1000;
 
@@ -89,13 +89,16 @@ class PersistentPolkadotApi {
       await this.disconnect();
 
       const endpoint = this.endpoints[this.currentEndpointIndex];
+      console.log(`🔄 Attempting to connect to: ${endpoint}`);
       this.updateState({ endpoint });
 
       this.provider = new WsProvider(endpoint, this.connectionTimeout);
 
       // SETUP PROVIDER EVENT HANDLERS
       this.provider.on("connected", () => this.handleConnected());
-      this.provider.on("disconnected", () => this.handleDisconnected());
+      this.provider.on("disconnected", (event: CloseEvent) =>
+        this.handleDisconnected(event.code, event.reason)
+      );
       this.provider.on("error", (error: Error) => this.handleError(error));
 
       this.api = await ApiPromise.create({
@@ -121,6 +124,10 @@ class PersistentPolkadotApi {
         lastError: null,
         lastSuccessfulConnection: Date.now(),
       });
+
+      // Reset retry delay on successful connection
+      this.retryDelay = 2000;
+      console.log(`✅ Successfully connected to: ${endpoint}`);
     } catch (error) {
       this.handleError(error as Error);
       this.rotateEndpoint();
@@ -160,7 +167,10 @@ class PersistentPolkadotApi {
     }
   }
 
-  private handleDisconnected() {
+  private handleDisconnected(code?: number, reason?: string) {
+    console.warn(
+      `Disconnected: Code ${code || "unknown"}, Reason: ${reason || "unknown"}`
+    );
     if (this.state.status !== "disconnected") {
       this.updateState({ status: "disconnected" });
       this.scheduleReconnect();
@@ -168,6 +178,7 @@ class PersistentPolkadotApi {
   }
 
   private handleError(error: Error) {
+    console.error("Connection error:", error.message);
     this.updateState({
       status: "error",
       lastError: error.message,
@@ -181,7 +192,11 @@ class PersistentPolkadotApi {
   }
 
   private scheduleReconnect() {
-    if (this.state.connectionAttempts >= this.maxRetries) {
+    if (
+      this.maxRetries > 0 &&
+      this.state.connectionAttempts >= this.maxRetries
+    ) {
+      console.error("Max connection attempts reached");
       this.updateState({
         status: "error",
         lastError: "Max connection attempts reached",
@@ -189,6 +204,7 @@ class PersistentPolkadotApi {
       return;
     }
 
+    console.log(`Scheduling reconnect in ${this.retryDelay / 1000}s...`);
     setTimeout(() => {
       this.connect();
     }, this.retryDelay);
@@ -229,6 +245,13 @@ class PersistentPolkadotApi {
     }, 15000); // Check every 15 seconds
   }
 
+  public forceReconnect() {
+    this.state.connectionAttempts = 0;
+    this.retryDelay = 2000; // Reset backoff
+    console.log("Initiating forced reconnect...");
+    this.connect();
+  }
+
   async getApi(): Promise<ApiPromise> {
     if (this.api && this.state.status === "connected") {
       return this.api;
@@ -247,6 +270,7 @@ class PersistentPolkadotApi {
           resolve(state.api);
         } else if (
           state.status === "error" &&
+          this.maxRetries > 0 &&
           state.connectionAttempts >= this.maxRetries
         ) {
           clearTimeout(timeout);
@@ -300,6 +324,7 @@ export function usePolkadot() {
     isDegraded: state.status === "degraded",
     connect: () => createApiManager().getApi(),
     disconnect: () => createApiManager().destroy(),
+    forceReconnect: () => createApiManager().forceReconnect(), // Expose for UI
   };
 }
 

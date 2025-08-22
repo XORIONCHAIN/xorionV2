@@ -12,7 +12,8 @@ const formatBalance = (balance: string | number, decimals: number): string => {
 };
 
 const BridgeRelayerMonitor = () => {
-  const { api, isConnected, isConnecting } = usePolkadot();
+  const { api, isConnected, isConnecting, forceReconnect, status, lastError } =
+    usePolkadot();
   const [relayers, setRelayers] = useState<string[]>([]);
   const [isPaused, setIsPaused] = useState<boolean | null>(null);
   const [totalLocked, setTotalLocked] = useState<string>("0");
@@ -87,12 +88,24 @@ const BridgeRelayerMonitor = () => {
     }
   }, [api, isConnected]);
 
+  useEffect(() => {
+    if (["error", "disconnected"].includes(status)) {
+      const timer = setTimeout(() => forceReconnect(), 30000);
+      return () => clearTimeout(timer);
+    }
+  }, [status, forceReconnect]);
+
   return (
     <Card className="max-w-lg mx-auto">
       <CardHeader>
         <CardTitle>Bridge Status</CardTitle>
       </CardHeader>
       <CardContent>
+        {lastError && (
+          <Alert variant="destructive" className="mb-4">
+            <AlertDescription>{lastError}</AlertDescription>
+          </Alert>
+        )}
         {error && (
           <Alert variant="destructive" className="mb-4">
             <AlertDescription>{error}</AlertDescription>
