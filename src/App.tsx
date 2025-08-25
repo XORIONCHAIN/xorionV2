@@ -43,22 +43,23 @@ const App = () => (
                   <Routes>
                     <Route path="/" element={<LandingPage />} />
                     <Route path="/explorer" element={<Index />} />
-                    <Route path="/tasks" element={<TasksPage />} />
-                    <Route
-                      path="/tasks/leaderboard"
-                      element={<LeaderboardPage />}
-                    />
+                    {/* <Route path="/tasks" element={<TasksPage />} />
+                        <Route
+                        path="/tasks/leaderboard"
+                        element={<LeaderboardPage />}
+                        />
+                        */}
                     <Route path="*" element={<NotFound />} />
-                  </Routes>
-                  <BackToTop />
-                </div>
-              </Suspense>
-            </BrowserRouter>
-          </WalletProvider>
-        </TooltipProvider>
-      </ThemeProvider>
-    </QueryClientProvider>
-  </WagmiProvider>
+                    </Routes>
+                    <BackToTop />
+                    </div>
+                    </Suspense>
+                    </BrowserRouter>
+                    </WalletProvider>
+                    </TooltipProvider>
+                    </ThemeProvider>
+                    </QueryClientProvider>
+                    </WagmiProvider>
 );
 
 export default App;

@@ -147,7 +147,7 @@ const Index = () => {
     { id: "validators", label: "Validators", icon: FaUsers },
     { id: "transactions", label: "Transactions", icon: FaBolt },
     { id: "transfer", label: "Transfer", icon: FaPaperPlane },
-    { id: "airdrop", label: "Airdrop", icon: GiTwoCoins },
+    // { id: "airdrop", label: "Airdrop", icon: GiTwoCoins },
     { id: "bridge", label: "Bridge", icon: GiTwoCoins },
     { id: "confidential", label: "Confidential (zk)", icon: GiSecurityGate },
   ];
@@ -174,12 +174,12 @@ const Index = () => {
             <TransactionExplorer initialSearchHash={searchHash} />
           </Suspense>
         );
-      case "airdrop":
-        return (
-          <Suspense fallback={<div>Loading transfer...</div>}>
-            <AirdropPanel />
-          </Suspense>
-        );
+      // case "airdrop":
+      //   return (
+      //     <Suspense fallback={<div>Loading transfer...</div>}>
+      //       <AirdropPanel />
+      //     </Suspense>
+      //   );
       case "transfer":
         return (
           <Suspense fallback={<div>Loading transfer...</div>}>
