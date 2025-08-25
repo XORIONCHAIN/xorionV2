@@ -39,7 +39,7 @@ const LandingPage = () => {
     { name: 'Features', href: '#features' },
     { name: 'About', href: '#about' },
     { name: 'Community', href: '#community' },
-    // { name: 'Airdrop Tasks', href: '/tasks' },
+    { name: 'Airdrop Tasks', href: '/tasks' },
   ];
 
   return (
