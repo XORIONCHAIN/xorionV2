@@ -21,10 +21,10 @@ const ConfidentialPanel: React.FC = () => {
 
   const [api, setApi] = useState<ApiPromise | null>(null);
   const [merkleRoot, setMerkleRoot] = useState<string | null>(null);
-  const [userNotes, setUserNotes] = useState<{ amount: string; secret: string; commitment: string; leafIndex: number }[]>([]);
+  const [userNotes, setUserNotes] = useState<{ amount: string; nonce: string; commitment: string; leafIndex: number }[]>([]);
   const [state, setState] = useState({
     activeTab: 'deposit',
-    deposit: { amount: "", recipient: "" },
+    deposit: { amount: "" },
     withdraw: { noteIndex: null as number | null, amount: "", recipient: "" },
     transact: {
       fromNote1: null as number | null,
@@ -32,7 +32,6 @@ const ConfidentialPanel: React.FC = () => {
       toAmount1: "",
       toRecipient1: "",
       toAmount2: "",
-      toRecipient2: "",
     },
     loading: false,
     error: null as string | null,
@@ -50,7 +49,7 @@ const ConfidentialPanel: React.FC = () => {
         setMerkleRoot(merkleRootValue.toHex());
 
         // Load notes from local storage
-        const storedNotes = await localforage.getItem<{ amount: string; secret: string; commitment: string; leafIndex: number }[]>('privateNotes');
+        const storedNotes = await localforage.getItem<{ amount: string; nonce: string; commitment: string; leafIndex: number }[]>('privateNotes');
         if (storedNotes) setUserNotes(storedNotes);
 
         // Event subscription
@@ -84,36 +83,39 @@ const ConfidentialPanel: React.FC = () => {
     connect();
   }, [polkadotApi]);
 
-  const saveNote = async (note: { amount: string; secret: string; commitment: string; leafIndex: number }) => {
+  const saveNote = async (note: { amount: string; nonce: string; commitment: string; leafIndex: number }) => {
     const notes = [...userNotes, note];
     setUserNotes(notes);
     await localforage.setItem('privateNotes', notes);
   };
 
-  const generateDepositProof = async () => {
-    const { amount, recipient } = state.deposit;
-    if (!amount || !recipient) throw new Error("Amount and recipient required");
+  const generateNonce = () => {
+    const nonceBuffer = new Uint8Array(32);
+    window.crypto.getRandomValues(nonceBuffer); // Browser-compatible
+    return Array.from(nonceBuffer).map(b => b.toString(16).padStart(2, '0')).join('');
+  };
 
-    // Generate random secret (use crypto.randomBytes in Node or window.crypto.getRandomValues in browser)
-    const secretBuffer = new Uint8Array(32);
-    window.crypto.getRandomValues(secretBuffer); // Browser-compatible
-    const secret = Array.from(secretBuffer).map(b => b.toString(16).padStart(2, '0')).join('');
+  const generateDepositProof = async () => {
+    const { amount } = state.deposit;
+    if (!amount || !selectedAccount) throw new Error("Amount and selected account required");
+
+    const nonce = generateNonce();
 
     const amountBn = hexToBn(amount);
-    const recipientBn = hexToBn(recipient.startsWith('0x') ? recipient : `0x${recipient}`);
-    const secretBn = hexToBn(secret);
-    const commitmentBn = poseidon([amountBn, recipientBn, secretBn]);
+    const recipientBn = hexToBn(selectedAccount.address.startsWith('0x') ? selectedAccount.address : `0x${selectedAccount.address}`);
+    const nonceBn = hexToBn(nonce);
+    const commitmentBn = poseidon([amountBn, recipientBn, nonceBn]);
     const commitment = `0x${commitmentBn.toString(16).padStart(64, '0')}`;
 
     const { proof, publicSignals } = await snarkjs.groth16.fullProve(
-      { amount: amountBn.toString(), recipient: recipientBn.toString(), secret: secretBn.toString() },
+      { amount: amountBn.toString(), recipient: recipientBn.toString(), nonce: nonceBn.toString() },
       "/public/circuits/deposit.wasm",
       "/public/keys/deposit_0001.zkey"
     );
     const proofData = await snarkjs.groth16.exportSolidityCallData(proof, publicSignals);
     const proofBytes = proofData.split(",")[0].trim();
 
-    return { proofBytes, commitment, secret };
+    return { proofBytes, commitment, nonce };
   };
 
   const handleDeposit = async () => {
@@ -123,7 +125,7 @@ const ConfidentialPanel: React.FC = () => {
     }
     setState((prev) => ({ ...prev, loading: true, error: null }));
     try {
-      const { proofBytes, commitment, secret } = await generateDepositProof();
+      const { proofBytes, commitment, nonce } = await generateDepositProof();
       const amountBN = new BN(state.deposit.amount);
       const amountBytes = bnToU8a(amountBN, { bitLength: 128, isLe: false });
       const publicInputs = [amountBytes, stringToHex(commitment)];
@@ -135,7 +137,7 @@ const ConfidentialPanel: React.FC = () => {
           const depositEvent = result.events.find((e: any) => e.event.method === 'Deposit');
           const leafIndex = depositEvent ? depositEvent.event.data[2].toNumber() : null;
           if (leafIndex !== null) {
-            saveNote({ amount: state.deposit.amount, secret, commitment, leafIndex });
+            saveNote({ amount: state.deposit.amount, nonce, commitment, leafIndex });
           }
           setState((prev) => ({
             ...prev,
@@ -169,8 +171,8 @@ const ConfidentialPanel: React.FC = () => {
     const note = userNotes[noteIndex];
     if (!note) throw new Error("Invalid note");
 
-    const secretBn = hexToBn(note.secret);
-    const nullifierBn = poseidon([secretBn]);
+    const nonceBn = hexToBn(note.nonce);
+    const nullifierBn = poseidon([nonceBn]);
     const nullifier = `0x${nullifierBn.toString(16).padStart(64, '0')}`;
     const path = await fetchMerklePath(note.leafIndex);
 
@@ -186,7 +188,7 @@ const ConfidentialPanel: React.FC = () => {
         amount: amountBn.toString(),
         fee: fee.toString(),
         path,
-        secret: secretBn.toString(),
+        nonce: nonceBn.toString(),
         commitment: hexToBn(note.commitment).toString(),
       },
       "/public/circuits/transfer.wasm",
@@ -243,33 +245,29 @@ const ConfidentialPanel: React.FC = () => {
   };
 
   const generateTransactProof = async () => {
-    const { fromNote1, fromNote2, toAmount1, toRecipient1, toAmount2, toRecipient2 } = state.transact;
+    const { fromNote1, fromNote2, toAmount1, toRecipient1, toAmount2 } = state.transact;
     if (fromNote1 === null || fromNote2 === null) throw new Error("Select two notes");
 
     const note1 = userNotes[fromNote1];
     const note2 = userNotes[fromNote2];
 
-    const nullifier1Bn = poseidon([hexToBn(note1.secret)]);
-    const nullifier2Bn = poseidon([hexToBn(note2.secret)]);
+    const nullifier1Bn = poseidon([hexToBn(note1.nonce)]);
+    const nullifier2Bn = poseidon([hexToBn(note2.nonce)]);
     const nullifier1 = `0x${nullifier1Bn.toString(16).padStart(64, '0')}`;
     const nullifier2 = `0x${nullifier2Bn.toString(16).padStart(64, '0')}`;
 
-    // Generate new secrets and commitments for outputs
-    const secret1Buffer = new Uint8Array(32);
-    window.crypto.getRandomValues(secret1Buffer);
-    const secret1 = Array.from(secret1Buffer).map(b => b.toString(16).padStart(2, '0')).join('');
-    const secret2Buffer = new Uint8Array(32);
-    window.crypto.getRandomValues(secret2Buffer);
-    const secret2 = Array.from(secret2Buffer).map(b => b.toString(16).padStart(2, '0')).join('');
+    // Generate new nonces and commitments for outputs
+    const nonce1 = generateNonce();
+    const nonce2 = generateNonce();
 
     const toAmount1Bn = hexToBn(toAmount1);
     const toRecipient1Bn = hexToBn(toRecipient1.startsWith('0x') ? toRecipient1 : `0x${toRecipient1}`);
-    const commitment1Bn = poseidon([toAmount1Bn, toRecipient1Bn, hexToBn(secret1)]);
+    const commitment1Bn = poseidon([toAmount1Bn, toRecipient1Bn, hexToBn(nonce1)]);
     const commitment1 = `0x${commitment1Bn.toString(16).padStart(64, '0')}`;
 
     const toAmount2Bn = hexToBn(toAmount2);
-    const toRecipient2Bn = hexToBn(toRecipient2.startsWith('0x') ? toRecipient2 : `0x${toRecipient2}`);
-    const commitment2Bn = poseidon([toAmount2Bn, toRecipient2Bn, hexToBn(secret2)]);
+    const toRecipient2Bn = hexToBn(selectedAccount.address.startsWith('0x') ? selectedAccount.address : `0x${selectedAccount.address}`);
+    const commitment2Bn = poseidon([toAmount2Bn, toRecipient2Bn, hexToBn(nonce2)]);
     const commitment2 = `0x${commitment2Bn.toString(16).padStart(64, '0')}`;
 
     const path1 = await fetchMerklePath(note1.leafIndex);
@@ -284,8 +282,8 @@ const ConfidentialPanel: React.FC = () => {
         commitment2: commitment2Bn.toString(),
         path1,
         path2,
-        secret1: hexToBn(note1.secret).toString(),
-        secret2: hexToBn(note2.secret).toString(),
+        nonce1: hexToBn(note1.nonce).toString(),
+        nonce2: hexToBn(note2.nonce).toString(),
         // Add other inputs as per circuit (e.g., balances conservation private)
       },
       "/public/circuits/transfer.wasm",
@@ -294,7 +292,7 @@ const ConfidentialPanel: React.FC = () => {
     const proofData = await snarkjs.groth16.exportSolidityCallData(proof, publicSignals);
     const proofBytes = proofData.split(",")[0].trim();
 
-    return { proofBytes, nullifier1, nullifier2, commitment1, commitment2, newSecret1: secret1, newSecret2: secret2, newAmount1: toAmount1, newRecipient1: toRecipient1, newAmount2: toAmount2, newRecipient2: toRecipient2 };
+    return { proofBytes, nullifier1, nullifier2, commitment1, commitment2, newNonce1: nonce1, newNonce2: nonce2, newAmount1: toAmount1, newRecipient1: toRecipient1, newAmount2: toAmount2 };
   };
 
   const handleTransact = async () => {
@@ -304,7 +302,7 @@ const ConfidentialPanel: React.FC = () => {
     }
     setState((prev) => ({ ...prev, loading: true, error: null }));
     try {
-      const { proofBytes, nullifier1, nullifier2, commitment1, commitment2, newSecret1, newSecret2, newAmount1, newRecipient1, newAmount2, newRecipient2 } = await generateTransactProof();
+      const { proofBytes, nullifier1, nullifier2, commitment1, commitment2, newNonce1, newNonce2, newAmount1, newAmount2 } = await generateTransactProof();
       const publicInputs = [
         stringToHex(merkleRoot),
         stringToHex(nullifier1),
@@ -322,8 +320,8 @@ const ConfidentialPanel: React.FC = () => {
           // Placeholder for new leaf indices - in real, subscribe to events or query
           const newLeaf1 = userNotes.length + 1; // Fake; replace with real
           const newLeaf2 = newLeaf1 + 1;
-          newNotes.push({ amount: newAmount1, secret: newSecret1, commitment: commitment1, leafIndex: newLeaf1 });
-          newNotes.push({ amount: newAmount2, secret: newSecret2, commitment: commitment2, leafIndex: newLeaf2 });
+          newNotes.push({ amount: newAmount1, nonce: newNonce1, commitment: commitment1, leafIndex: newLeaf1 });
+          newNotes.push({ amount: newAmount2, nonce: newNonce2, commitment: commitment2, leafIndex: newLeaf2 });
           setUserNotes(newNotes);
           localforage.setItem('privateNotes', newNotes);
           setState((prev) => ({
@@ -363,16 +361,6 @@ const ConfidentialPanel: React.FC = () => {
               onChange={(e) => setState((prev) => ({ ...prev, deposit: { ...prev.deposit, amount: e.target.value } }))}
               className="w-full p-2 bg-gray-700 border border-gray-600 rounded"
               placeholder="Enter amount"
-            />
-          </div>
-          <div>
-            <label className="block text-sm text-gray-300">Private Recipient (your address for note):</label>
-            <input
-              type="text"
-              value={state.deposit.recipient}
-              onChange={(e) => setState((prev) => ({ ...prev, deposit: { ...prev.deposit, recipient: e.target.value } }))}
-              className="w-full p-2 bg-gray-700 border border-gray-600 rounded"
-              placeholder="0xYourAddress"
             />
           </div>
           <button
@@ -490,16 +478,6 @@ const ConfidentialPanel: React.FC = () => {
               onChange={(e) => setState((prev) => ({ ...prev, transact: { ...prev.transact, toAmount2: e.target.value } }))}
               className="w-full p-2 bg-gray-700 border border-gray-600 rounded"
               placeholder="Enter amount"
-            />
-          </div>
-          <div>
-            <label className="block text-sm text-gray-300">To Recipient 2 (your private address):</label>
-            <input
-              type="text"
-              value={state.transact.toRecipient2}
-              onChange={(e) => setState((prev) => ({ ...prev, transact: { ...prev.transact, toRecipient2: e.target.value } }))}
-              className="w-full p-2 bg-gray-700 border border-gray-600 rounded"
-              placeholder="0xRecipient2"
             />
           </div>
           <button
