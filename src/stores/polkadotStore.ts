@@ -871,11 +871,11 @@ async function fetchEnhancedTransactionData(api: ApiPromise) {
   for (let i = 0; i < blockNumbers.length; i++) {
     if (!blocksAndEvents[i]) continue;
     const blockNumber = blockNumbers[i];
-    const [block, events] = blocksAndEvents[i];
+    const [signedBlock, events] = blocksAndEvents[i] as [any, any];
 
     try {
       let timestamp: Date | null = null;
-      const timestampExtrinsic = block.block.extrinsics.find(
+      const timestampExtrinsic = signedBlock.block.extrinsics.find(
         (ext) =>
           ext.method.section === "timestamp" && ext.method.method === "set"
       );
@@ -888,13 +888,13 @@ async function fetchEnhancedTransactionData(api: ApiPromise) {
         height: blockNumber,
         hash: blockHashes[i].toHex(),
         timestamp,
-        txCount: block.block.extrinsics.length,
+        txCount: signedBlock.block.extrinsics.length,
         proposer: "Unknown",
-        size: JSON.stringify(block.block).length.toString(),
+        size: JSON.stringify(signedBlock.block).length.toString(),
       });
 
       // Process extrinsics with enhanced transfer detection
-      block.block.extrinsics.forEach((extrinsic, index) => {
+      signedBlock.block.extrinsics.forEach((extrinsic, index) => {
         const txHash = extrinsic.hash.toHex();
 
         // Get events for this extrinsic
