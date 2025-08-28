@@ -16,7 +16,7 @@ import { usePolkadotStore } from '@/stores/polkadotStore';
 // XORION CHAIN CONFIGURATION
 const XORION_CHAIN_CONFIG = {
   name: 'XOR',
-  symbol: 'tXOR',
+  symbol: 'XOR',
   decimals: 18,
   endpoint: import.meta.env.VITE_XORION_WS || "ws://3.219.48.230:9944",
   ss58Format: 42,
@@ -44,15 +44,17 @@ interface BalanceFormatterOptions {
 }
 
 // TOKEN FORMATTING HELPER
-const formatToken = (amount: string | BN | number, 
-  decimals = 18, unit = 'tXOR', 
+const formatToken = (amount: string | BN | number,
+  decimals = 18, unit = 'XOR',
   decimalsToShow = 6) => {
   if (amount == null) return `0 ${unit}`;
   const divisor = Math.pow(10, decimals);
   const display = Number(amount) / divisor;
-  return `${display.toLocaleString(undefined, 
-    { minimumFractionDigits: decimalsToShow, 
-      maximumFractionDigits: decimalsToShow })} ${unit}`;
+  return `${display.toLocaleString(undefined,
+    {
+      minimumFractionDigits: decimalsToShow,
+      maximumFractionDigits: decimalsToShow
+    })} ${unit}`;
 };
 
 const TransferFunds = () => {
@@ -187,7 +189,7 @@ const TransferFunds = () => {
     }
   }, [api]);
 
-  // CONVERT tXOR AMOUNT TO IONS - MEMOIZED
+  // CONVERT XOR AMOUNT TO IONS - MEMOIZED
   const tXORToIons = useCallback((amount: string): BN => {
     if (!amount || amount === '0' || amount === '') return new BN(0);
 
@@ -215,7 +217,7 @@ const TransferFunds = () => {
     }
   }, []);
 
-  // CONVERT IONS BACK TO tXOR - MEMOIZED
+  // CONVERT IONS BACK TO XOR - MEMOIZED
   const ionsToTXOR = useCallback((ions: BN): string => {
     if (ions.isZero()) return '0';
 
@@ -277,7 +279,7 @@ const TransferFunds = () => {
 
       if (amountInIons.gt(availableInIons)) {
         const availableInTXOR = ionsToTXOR(availableInIons);
-        return { isValid: false, error: `Insufficient balance. Available: ${availableInTXOR} tXOR` };
+        return { isValid: false, error: `Insufficient balance. Available: ${availableInTXOR} XOR` };
       }
 
       return { isValid: true };
@@ -329,7 +331,7 @@ const TransferFunds = () => {
           const requiredTXOR = ionsToTXOR(totalRequired.add(XORION_CHAIN_CONFIG.existentialDeposit));
           toast({
             title: 'Insufficient Balance',
-            description: `Need ${requiredTXOR} tXOR including fees and minimum balance`,
+            description: `Need ${requiredTXOR} XOR including fees and minimum balance`,
             variant: 'destructive'
           });
           setLoading(false);
@@ -407,7 +409,7 @@ const TransferFunds = () => {
 
               toast({
                 title: 'Transfer Successful',
-                description: `Successfully sent ${amount} tXOR`
+                description: `Successfully sent ${amount} XOR`
               });
 
               setAmount('');
@@ -503,58 +505,58 @@ const TransferFunds = () => {
   const amountValidation = getAmountValidation();
 
   const useBalanceFormatter = (
-  balance: BN | bigint | number | string,
-  { decimals = 12, symbol = "UNIT" }: BalanceFormatterOptions = {}
-  ): string  => {
-  return useMemo(() => {
-    if (balance === undefined || balance === null) return "--";
+    balance: BN | bigint | number | string,
+    { decimals = 12, symbol = "UNIT" }: BalanceFormatterOptions = {}
+  ): string => {
+    return useMemo(() => {
+      if (balance === undefined || balance === null) return "--";
 
-    let bnValue: BN;
+      let bnValue: BN;
 
-    if (BN.isBN(balance)) {
-      bnValue = balance;
-    } else if (typeof balance === "bigint") {
-      bnValue = new BN(balance.toString());
-    } else if (typeof balance === "number") {
-      // numbers are safe only if < 2^53
-      bnValue = new BN(balance);
-    } else if (typeof balance === "string") {
-      bnValue = new BN(balance, 10);
-    } else {
-      return "--";
-    }
+      if (BN.isBN(balance)) {
+        bnValue = balance;
+      } else if (typeof balance === "bigint") {
+        bnValue = new BN(balance.toString());
+      } else if (typeof balance === "number") {
+        // numbers are safe only if < 2^53
+        bnValue = new BN(balance);
+      } else if (typeof balance === "string") {
+        bnValue = new BN(balance, 10);
+      } else {
+        return "--";
+      }
 
-    return formatBalance(bnValue, {
-      decimals,
-      withSi: true,
-      withUnit: symbol,
-      forceUnit: '-'
-    });
-  }, [balance, decimals, symbol])
+      return formatBalance(bnValue, {
+        decimals,
+        withSi: true,
+        withUnit: symbol,
+        forceUnit: '-'
+      });
+    }, [balance, decimals, symbol])
   }
 
 
   // Example with existential deposit
-const existentialDeposit = useBalanceFormatter(XORION_CHAIN_CONFIG.existentialDeposit, {
-  decimals: 18,
-  symbol: "tXOR",
-});
+  const existentialDeposit = useBalanceFormatter(XORION_CHAIN_CONFIG.existentialDeposit, {
+    decimals: 18,
+    symbol: "XOR",
+  });
 
-// Example with a dynamic getter
-const availableVal = useBalanceFormatter(getMaxTransferableAmount(), {
-  decimals: 18,
-  symbol: "tXOR",
-});
+  // Example with a dynamic getter
+  const availableVal = useBalanceFormatter(getMaxTransferableAmount(), {
+    decimals: 18,
+    symbol: "XOR",
+  });
 
-const lockedBalanceVal = useBalanceFormatter(lockedBalance, {
-  decimals: 18,
-  symbol: "tXOR",
-});
+  const lockedBalanceVal = useBalanceFormatter(lockedBalance, {
+    decimals: 18,
+    symbol: "XOR",
+  });
 
-const balanceVal = useBalanceFormatter(balance, {
-  decimals: 18,
-  symbol: "tXOR",
-});
+  const balanceVal = useBalanceFormatter(balance, {
+    decimals: 18,
+    symbol: "XOR",
+  });
 
 
   return (
@@ -631,7 +633,7 @@ const balanceVal = useBalanceFormatter(balance, {
                       <div className="flex justify-between text-white">
                         <span>Available:</span>
                         <span className="font-mono text-green-400">
-                          { availableVal}
+                          {availableVal}
                         </span>
                         {/* <span className="font-mono text-green-400">
                           {formatBalance(getMaxTransferableAmount(), { decimals: 18, withUnit: 'tXOR',  withSi: false })}
@@ -639,7 +641,7 @@ const balanceVal = useBalanceFormatter(balance, {
                       </div>
                       <div className="flex justify-between text-white">
                         <span>Locked:</span>
-                        <span className="font-mono text-orange-400">{ lockedBalanceVal}</span>
+                        <span className="font-mono text-orange-400">{lockedBalanceVal}</span>
                         {/* <span className="font-mono text-orange-400">{formatBalance(lockedBalance, { decimals: 18, withUnit: 'tXOR',  withSi: false })}</span> */}
                       </div>
                     </div>
@@ -715,7 +717,7 @@ const balanceVal = useBalanceFormatter(balance, {
 
                   <div className="mt-2 space-y-1">
                     <div className="text-sm text-muted-foreground">
-                      Available: {formatBalance(getMaxTransferableAmount(), { decimals: 18, withUnit: 'tXOR', })}
+                      Available: {formatBalance(getMaxTransferableAmount(), { decimals: 18, withUnit: 'XOR', })}
                     </div>
 
                     {amountValidation && !amountValidation.isValid && (
@@ -836,7 +838,7 @@ const balanceVal = useBalanceFormatter(balance, {
                 <div className="flex justify-between text-sm">
                   <span className="text-white">Min. Balance:</span>
                   <span className="font-medium text-white">
-                    {formatBalance(XORION_CHAIN_CONFIG.existentialDeposit, { decimals: 18, withUnit: 'tXOR'})}
+                    {formatBalance(XORION_CHAIN_CONFIG.existentialDeposit, { decimals: 18, withUnit: 'XOR' })}
                   </span>
                 </div>
               </CardContent>

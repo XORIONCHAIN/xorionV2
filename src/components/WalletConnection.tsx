@@ -198,8 +198,8 @@ const WalletConnection = () => {
         const installedNames = walletCache.getInstalled();
         const installed = POPULAR_WALLETS
           .filter(wallet => installedNames.includes(wallet.name))
-          .map(wallet => ({ 
-            ...wallet, 
+          .map(wallet => ({
+            ...wallet,
             installed: true,
             previouslyConnected: wallet.name === previouslyConnectedWallet.current
           }));
@@ -351,7 +351,7 @@ const WalletConnection = () => {
     setSelectedWallet(wallet);
     setStep('accounts');
     setLoading(true);
-    
+
     try {
       await enableWeb3();
       const accounts = await Promise.race([
@@ -360,13 +360,13 @@ const WalletConnection = () => {
       ]) as InjectedAccountWithMeta[];
 
       setAccounts(accounts);
-      
+
       // Check if there's a saved account for this wallet
       const savedConnection = loadWalletConnection();
       if (savedConnection && savedConnection.walletName === wallet.name) {
         const matchingAccount = accounts.find(
-          acc => acc.address === savedConnection.accountAddress && 
-                 acc.meta.source === savedConnection.accountSource
+          acc => acc.address === savedConnection.accountAddress &&
+            acc.meta.source === savedConnection.accountSource
         );
         if (matchingAccount) {
           setSelectedAccount(matchingAccount);
@@ -430,10 +430,12 @@ const WalletConnection = () => {
     if (!api) return 'Unknown';
     try {
       const chain = api.genesisHash?.toHex();
+      const XORION_MAINNET_GENESIS = import.meta.env.VITE_XORION_MAINNET_GENESIS;
       if (chain === '0x91b171bb158e2d3848fa23a9f1c25182fb8e20313b2c1eb49219da7a70ce90c3') return 'Polkadot';
       if (chain === '0xe143f23803ac50e8f6f8e62695d1ce9e4e1d68aa36c1cd2cfd15340213f3423e') return 'Westend';
-      if (chain === '0x67dddf2673b69e5f875f6f252774958c98deac9b') return 'Kusama';
-      return 'Xorion Network';
+      if (chain === '0xb0a8d493285c2df73290dfb7e61f870f17b41801197a149ca93654499ea3dafe') return 'Kusama';
+      if (XORION_MAINNET_GENESIS && chain === XORION_MAINNET_GENESIS) return 'Xorion Mainnet';
+      return 'Xorion Mainnet';
     } catch {
       return 'Unknown';
     }
@@ -598,7 +600,7 @@ const WalletConnection = () => {
                 <div>
                   <div className="text-sm text-muted-foreground mb-1">Balance</div>
                   <div className="text-lg font-bold text-white">
-                    {formattedBalance} tXOR
+                    {formattedBalance} XOR
                   </div>
                 </div>
               )}

@@ -193,7 +193,7 @@ const DEFAULT_METRICS: NetworkMetrics = {
   lastUpdated: 0,
 };
 
-console.log(ENDPOINTS)
+console.log(ENDPOINTS);
 
 // TIMEOUT CONSTANTS
 const CONNECTION_TIMEOUT = 30000;
@@ -980,7 +980,7 @@ function detectTransferFromExtrinsic(
     from: undefined as string | undefined,
     to: undefined as string | undefined,
     amount: undefined as string | undefined,
-    asset: "tXOR",
+    asset: "XOR",
     decodedData: undefined as any,
   };
 

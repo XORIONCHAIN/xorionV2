@@ -132,10 +132,10 @@ const TransactionExplorer = () => {
         case 'transfers':
           // Use the enhanced transfer detection from the store
           matchesFilter = tx.isTransfer === true ||
-                        (tx.section === 'balances' && tx.method.toLowerCase().includes('transfer')) ||
-                        (tx.section === 'currencies' && tx.method.toLowerCase().includes('transfer')) ||
-                        (tx.section === 'tokens' && tx.method.toLowerCase().includes('transfer')) ||
-                        (tx.section === 'assets' && tx.method.toLowerCase().includes('transfer'));
+            (tx.section === 'balances' && tx.method.toLowerCase().includes('transfer')) ||
+            (tx.section === 'currencies' && tx.method.toLowerCase().includes('transfer')) ||
+            (tx.section === 'tokens' && tx.method.toLowerCase().includes('transfer')) ||
+            (tx.section === 'assets' && tx.method.toLowerCase().includes('transfer'));
           break;
         case 'staking':
           matchesFilter = tx.section === 'staking';
@@ -145,7 +145,7 @@ const TransactionExplorer = () => {
           break;
         case 'governance':
           matchesFilter = tx.section === 'democracy' || tx.section === 'council' ||
-                        tx.section === 'treasury' || tx.section === 'referenda';
+            tx.section === 'treasury' || tx.section === 'referenda';
           break;
         default:
           matchesFilter = true;
@@ -181,8 +181,8 @@ const TransactionExplorer = () => {
 
       // Validate hash format
       const isValidHash = normalizedHash.length === 64 ||
-                         (normalizedHash.startsWith('0x') && normalizedHash.length === 66) ||
-                         (normalizedHash.length === 64 && !normalizedHash.startsWith('0x'));
+        (normalizedHash.startsWith('0x') && normalizedHash.length === 66) ||
+        (normalizedHash.length === 64 && !normalizedHash.startsWith('0x'));
 
       if (!isValidHash) {
         toast({
@@ -247,7 +247,7 @@ const TransactionExplorer = () => {
     return `${address.slice(0, 6)}...${address.slice(-4)}`;
   };
 
-  const formatBalance = (balance: string) => formatTxor(balance) + ' tXOR';
+  const formatBalance = (balance: string) => formatTxor(balance) + ' XOR';
 
   const getStatusIcon = (success: boolean) => {
     return success ? (
@@ -280,8 +280,10 @@ const TransactionExplorer = () => {
     { value: 'transfers', label: 'Transfers', count: transactionData.transactions?.filter(tx => tx.isTransfer).length || 0 },
     { value: 'staking', label: 'Staking', count: transactionData.transactions?.filter(tx => tx.section === 'staking').length || 0 },
     { value: 'system', label: 'System', count: transactionData.transactions?.filter(tx => tx.section === 'system').length || 0 },
-    { value: 'governance', label: 'Governance', count: transactionData.transactions?.filter(tx =>
-      ['democracy', 'council', 'treasury', 'referenda'].includes(tx.section)).length || 0 }
+    {
+      value: 'governance', label: 'Governance', count: transactionData.transactions?.filter(tx =>
+        ['democracy', 'council', 'treasury', 'referenda'].includes(tx.section)).length || 0
+    }
   ];
 
   // Reset page when filter changes

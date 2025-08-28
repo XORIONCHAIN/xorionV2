@@ -18,18 +18,17 @@ import { parseUnits } from "viem";
 import BRIDGE_ABI from "@/lib/bridge-abi.json";
 import { decodeAddress } from "@polkadot/util-crypto";
 import { http, createConfig } from "wagmi";
-import { sepolia } from "wagmi/chains";
+import { mainnet } from "wagmi/chains";
 
 const TOKEN_DECIMALS = 18;
 const BRIDGE_CONTRACT_ADDRESS = "0x7cce42AbC9A7e3f835fCB9b04B2e352529dE172b";
-const SEPOLIA_CHAIN_ID = 11155111;
-const SEPOLIA_RPC =
-  import.meta.env.VITE_SEPOLIA_RPC || "https://rpc.sepolia.org";
+const ETH_CHAIN = mainnet;
+const ETH_RPC = import.meta.env.VITE_ETH_RPC as string;
 
 export const wagmiConfig = createConfig({
-  chains: [sepolia],
+  chains: [ETH_CHAIN],
   transports: {
-    [sepolia.id]: http(SEPOLIA_RPC),
+    [ETH_CHAIN.id]: http(ETH_RPC),
   },
 });
 
@@ -207,7 +206,7 @@ const BridgeLockForm = ({
         abi: BRIDGE_ABI,
         functionName: "lock",
         args: [amountUnits, recipientBytes],
-        chain: sepolia,
+        chain: ETH_CHAIN,
         account: ethAddress, // Fix: Add the connected Ethereum address
       });
     } catch (err) {
@@ -288,7 +287,7 @@ const BridgeLockForm = ({
         {activeTab === "release" && !isEthConnected && (
           <Alert variant="destructive" className="mb-4">
             <AlertDescription className="break-words whitespace-normal">
-              Please connect an Ethereum wallet (e.g., MetaMask on Sepolia) to
+              Please connect an Ethereum wallet (e.g., MetaMask on Ethereum Mainnet) to
               proceed.
             </AlertDescription>
           </Alert>
@@ -305,21 +304,19 @@ const BridgeLockForm = ({
               </div>
               <div className="flex border-b">
                 <button
-                  className={`flex-1 py-2 px-4 text-center ${
-                    activeTab === "bridge"
-                      ? "border-b-2 border-blue-500 text-blue-500"
-                      : "text-gray-500"
-                  }`}
+                  className={`flex-1 py-2 px-4 text-center ${activeTab === "bridge"
+                    ? "border-b-2 border-blue-500 text-blue-500"
+                    : "text-gray-500"
+                    }`}
                   onClick={() => setActiveTab("bridge")}
                 >
                   Bridge Tokens
                 </button>
                 <button
-                  className={`flex-1 py-2 px-4 text-center ${
-                    activeTab === "release"
-                      ? "border-b-2 border-blue-500 text-blue-500"
-                      : "text-gray-500"
-                  }`}
+                  className={`flex-1 py-2 px-4 text-center ${activeTab === "release"
+                    ? "border-b-2 border-blue-500 text-blue-500"
+                    : "text-gray-500"
+                    }`}
                   onClick={() => setActiveTab("release")}
                 >
                   Release Tokens
