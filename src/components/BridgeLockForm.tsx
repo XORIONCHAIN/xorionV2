@@ -204,7 +204,7 @@ const BridgeLockForm = ({
       writeContract({
         address: BRIDGE_CONTRACT_ADDRESS,
         abi: BRIDGE_ABI,
-        functionName: "lock",
+        functionName: "release",
         args: [amountUnits, recipientBytes],
         chain: ETH_CHAIN,
         account: ethAddress, // Fix: Add the connected Ethereum address
