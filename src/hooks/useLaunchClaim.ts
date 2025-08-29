@@ -15,6 +15,16 @@ export function useLaunchClaim() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const sanitizeNumericString = (value: unknown): string => {
+    if (value == null) return "0";
+    const s = value.toString();
+    // Remove common thousands separators and spaces that break BigInt
+    // Keep digits only; launch claim values are non-negative integers
+    const cleaned = s.replace(/[,\s_]/g, "");
+    // Fallback to 0 if nothing remains
+    return cleaned.length > 0 ? cleaned : "0";
+  };
+
   useEffect(() => {
     let unsub = false;
     const fetchClaim = async () => {
@@ -35,9 +45,11 @@ export function useLaunchClaim() {
         }
         const human: any = raw.toHuman?.() ?? raw;
         const parsed: ClaimInfo = {
-          total: (human?.total ?? human?.Total ?? "0").toString(),
-          claimed: (human?.claimed ?? human?.Claimed ?? "0").toString(),
-          start: (human?.start ?? human?.Start ?? "0").toString(),
+          total: sanitizeNumericString(human?.total ?? human?.Total ?? "0"),
+          claimed: sanitizeNumericString(
+            human?.claimed ?? human?.Claimed ?? "0"
+          ),
+          start: sanitizeNumericString(human?.start ?? human?.Start ?? "0"),
         };
         if (!unsub) setData(parsed);
       } catch (e: any) {
