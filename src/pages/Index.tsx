@@ -13,7 +13,6 @@ import { Sheet, SheetTrigger, SheetContent } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { Menu } from "lucide-react";
 import Footer from "@/components/Footer";
-import AirdropPanel from "@/components/AirdropPanel";
 import { GiSecurityGate, GiTwoCoins } from "react-icons/gi";
 
 // LAZY LOADED COMPONENTS
@@ -28,6 +27,7 @@ const BridgeRelayerMonitor = lazy(
   () => import("@/components/BridgeRelayerMonitor")
 );
 const ConfidentialPanel = lazy(() => import("@/components/ConfidentialPanel"));
+const Portfolio = lazy(() => import("@/pages/Portfolio"));
 
 const NavigationBar = ({ tabs, activeTab, setActiveTab }) => {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -44,11 +44,10 @@ const NavigationBar = ({ tabs, activeTab, setActiveTab }) => {
                 <button
                   key={tab.id}
                   onClick={() => setActiveTab(tab.id)}
-                  className={`flex items-center space-x-2 px-3 py-4 border-b-2 text-sm font-medium transition-colors ${
-                    activeTab === tab.id
-                      ? "border-transparent bg-gradient-to-r from-pink-400 to-purple-500 bg-clip-text text-transparent border-b-2 border-gradient-to-r from-pink-400 to-purple-500"
-                      : "border-transparent text-muted-foreground hover:text-foreground hover:border-border"
-                  }`}
+                  className={`flex items-center space-x-2 px-3 py-4 border-b-2 text-sm font-medium transition-colors ${activeTab === tab.id
+                    ? "border-transparent bg-gradient-to-r from-pink-400 to-purple-500 bg-clip-text text-transparent border-b-2 border-gradient-to-r from-pink-400 to-purple-500"
+                    : "border-transparent text-muted-foreground hover:text-foreground hover:border-border"
+                    }`}
                 >
                   <IconComponent className="w-4 h-4  text-gradient-to-r from-pink-400 to-purple-500" />
                   <span>{tab.label}</span>
@@ -103,11 +102,10 @@ const NavigationBar = ({ tabs, activeTab, setActiveTab }) => {
                           setActiveTab(tab.id);
                           setMobileMenuOpen(false);
                         }}
-                        className={`w-full flex items-center space-x-3 px-4 py-3 rounded-lg text-left transition-colors ${
-                          activeTab === tab.id
-                            ? "bg-primary/10 text-primary border border-primary/30"
-                            : "text-foreground hover:bg-muted"
-                        }`}
+                        className={`w-full flex items-center space-x-3 px-4 py-3 rounded-lg text-left transition-colors ${activeTab === tab.id
+                          ? "bg-primary/10 text-primary border border-primary/30"
+                          : "text-foreground hover:bg-muted"
+                          }`}
                       >
                         <IconComponent className="w-5 h-5" />
                         <span className="font-medium">{tab.label}</span>
@@ -150,6 +148,7 @@ const Index = () => {
     // { id: "airdrop", label: "Airdrop", icon: GiTwoCoins },
     { id: "bridge", label: "Bridge", icon: GiTwoCoins },
     { id: "confidential", label: "Confidential (zk)", icon: GiSecurityGate },
+    { id: "portfolio", label: "Portfolio", icon: FaChartLine },
   ];
 
   const renderContent = () => {
@@ -199,6 +198,12 @@ const Index = () => {
         return (
           <Suspense fallback={<div>Loading bridge</div>}>
             <ConfidentialPanel />
+          </Suspense>
+        );
+      case "portfolio":
+        return (
+          <Suspense fallback={<div>Loading portfolio</div>}>
+            <Portfolio />
           </Suspense>
         );
       default:
