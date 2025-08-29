@@ -217,10 +217,15 @@ const BridgeLockForm = ({
   };
 
   const handleConnectEthereum = () => {
-    const metaMask = connectors.find((c) => c.id === "metaMask");
+     console.log('Available connectors:', connectors);
+    const metaMask = connectors.find((c) => c.id === "io.metamask");
+    const trustWallet = connectors.find((c) => c.id === "com.trustwallet.app");
     if (metaMask) {
       connect({ connector: metaMask });
-    } else {
+    } else if (trustWallet){
+      connect({connector: trustWallet})
+    }
+    else {
       setError("MetaMask not detected. Please install it.");
     }
   };
@@ -244,6 +249,17 @@ const BridgeLockForm = ({
       });
     }
   }, [ethError, isEthSuccess, txHash, toast]);
+
+
+  useEffect(() => {
+  console.log('Ethereum connection status:', {
+    isEthConnected,
+    ethAddress,
+    connectors: connectors.map(c => ({id: c.id, name: c.name})),
+    hasWindowEthereum: typeof window.ethereum !== 'undefined'
+  });
+}, [isEthConnected, ethAddress, connectors]);
+
 
   return (
     <Card className="max-w-lg mx-auto">
