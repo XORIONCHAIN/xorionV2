@@ -6,11 +6,20 @@ import { BN } from "bn.js";
 import * as snarkjs from "snarkjs"; // Adjusted import for snarkjs
 import { usePolkadot } from "@/hooks/use-polkadot";
 import localforage from 'localforage'; // For storing notes securely
-import { poseidon } from 'circomlibjs'; // For secure hashing (install circomlibjs)
+import { buildPoseidon } from 'circomlibjs'; // Build Poseidon hash for browser
 
 const ConfidentialPanel: React.FC = () => {
   const { selectedAccount } = useWallet();
   const { api: polkadotApi, forceReconnect, status } = usePolkadot();
+
+  const [poseidon, setPoseidon] = useState<((inputs: bigint[]) => bigint) | null>(null);
+
+  useEffect(() => {
+    // Initialize Poseidon once for hashing in the browser
+    buildPoseidon().then(setPoseidon).catch((err) => {
+      console.error('Failed to initialize Poseidon:', err);
+    });
+  }, []);
 
   useEffect(() => {
     if (["error", "disconnected"].includes(status)) {
@@ -104,8 +113,13 @@ const ConfidentialPanel: React.FC = () => {
     const amountBn = hexToBn(amount);
     const recipientBn = hexToBn(selectedAccount.address.startsWith('0x') ? selectedAccount.address : `0x${selectedAccount.address}`);
     const nonceBn = hexToBn(nonce);
-    const commitmentBn = poseidon([amountBn, recipientBn, nonceBn]);
-    const commitment = `0x${commitmentBn.toString(16).padStart(64, '0')}`;
+    if (!poseidon) throw new Error("Poseidon not initialized");
+    const commitmentBigInt = poseidon([
+      BigInt(amountBn.toString()),
+      BigInt(recipientBn.toString()),
+      BigInt(nonceBn.toString()),
+    ]);
+    const commitment = `0x${commitmentBigInt.toString(16).padStart(64, '0')}`;
 
     const { proof, publicSignals } = await snarkjs.groth16.fullProve(
       { amount: amountBn.toString(), recipient: recipientBn.toString(), nonce: nonceBn.toString() },
@@ -172,8 +186,9 @@ const ConfidentialPanel: React.FC = () => {
     if (!note) throw new Error("Invalid note");
 
     const nonceBn = hexToBn(note.nonce);
-    const nullifierBn = poseidon([nonceBn]);
-    const nullifier = `0x${nullifierBn.toString(16).padStart(64, '0')}`;
+    if (!poseidon) throw new Error("Poseidon not initialized");
+    const nullifierBigInt = poseidon([BigInt(nonceBn.toString())]);
+    const nullifier = `0x${nullifierBigInt.toString(16).padStart(64, '0')}`;
     const path = await fetchMerklePath(note.leafIndex);
 
     const amountBn = hexToBn(amount);
@@ -251,10 +266,11 @@ const ConfidentialPanel: React.FC = () => {
     const note1 = userNotes[fromNote1];
     const note2 = userNotes[fromNote2];
 
-    const nullifier1Bn = poseidon([hexToBn(note1.nonce)]);
-    const nullifier2Bn = poseidon([hexToBn(note2.nonce)]);
-    const nullifier1 = `0x${nullifier1Bn.toString(16).padStart(64, '0')}`;
-    const nullifier2 = `0x${nullifier2Bn.toString(16).padStart(64, '0')}`;
+    if (!poseidon) throw new Error("Poseidon not initialized");
+    const nullifier1BigInt = poseidon([BigInt(hexToBn(note1.nonce).toString())]);
+    const nullifier2BigInt = poseidon([BigInt(hexToBn(note2.nonce).toString())]);
+    const nullifier1 = `0x${nullifier1BigInt.toString(16).padStart(64, '0')}`;
+    const nullifier2 = `0x${nullifier2BigInt.toString(16).padStart(64, '0')}`;
 
     // Generate new nonces and commitments for outputs
     const nonce1 = generateNonce();
@@ -262,13 +278,21 @@ const ConfidentialPanel: React.FC = () => {
 
     const toAmount1Bn = hexToBn(toAmount1);
     const toRecipient1Bn = hexToBn(toRecipient1.startsWith('0x') ? toRecipient1 : `0x${toRecipient1}`);
-    const commitment1Bn = poseidon([toAmount1Bn, toRecipient1Bn, hexToBn(nonce1)]);
-    const commitment1 = `0x${commitment1Bn.toString(16).padStart(64, '0')}`;
+    const commitment1BigInt = poseidon([
+      BigInt(toAmount1Bn.toString()),
+      BigInt(toRecipient1Bn.toString()),
+      BigInt(hexToBn(nonce1).toString())
+    ]);
+    const commitment1 = `0x${commitment1BigInt.toString(16).padStart(64, '0')}`;
 
     const toAmount2Bn = hexToBn(toAmount2);
     const toRecipient2Bn = hexToBn(selectedAccount.address.startsWith('0x') ? selectedAccount.address : `0x${selectedAccount.address}`);
-    const commitment2Bn = poseidon([toAmount2Bn, toRecipient2Bn, hexToBn(nonce2)]);
-    const commitment2 = `0x${commitment2Bn.toString(16).padStart(64, '0')}`;
+    const commitment2BigInt = poseidon([
+      BigInt(toAmount2Bn.toString()),
+      BigInt(toRecipient2Bn.toString()),
+      BigInt(hexToBn(nonce2).toString())
+    ]);
+    const commitment2 = `0x${commitment2BigInt.toString(16).padStart(64, '0')}`;
 
     const path1 = await fetchMerklePath(note1.leafIndex);
     const path2 = await fetchMerklePath(note2.leafIndex);

@@ -1,0 +1,5 @@
+#!/bin/sh
+
+# Husky v9 compatible pre-commit
+
+npx lint-staged

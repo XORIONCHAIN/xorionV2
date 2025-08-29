@@ -8,7 +8,9 @@
     "build": "vite build",
     "build:dev": "vite build --mode development",
     "lint": "eslint .",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "prepare": "husky"
   },
   "dependencies": {
     "@esbuild-plugins/node-globals-polyfill": "^0.2.3",
@@ -51,6 +53,7 @@
     "axios": "^1.11.0",
     "bn.js": "^5.2.2",
     "buffer": "^6.0.3",
+    "caniuse-lite": "^1.0.30001737",
     "circomlib": "^2.0.5",
     "circomlibjs": "^0.1.7",
     "class-variance-authority": "^0.7.1",
@@ -92,16 +95,30 @@
     "@types/node": "^22.5.5",
     "@types/react": "^18.3.3",
     "@types/react-dom": "^18.3.0",
+    "@typescript-eslint/eslint-plugin": "^8.41.0",
+    "@typescript-eslint/parser": "^8.41.0",
     "@vitejs/plugin-react-swc": "^3.5.0",
     "autoprefixer": "^10.4.20",
     "eslint": "^9.9.0",
     "eslint-plugin-react-hooks": "^5.1.0-rc.0",
     "eslint-plugin-react-refresh": "^0.4.9",
     "globals": "^15.9.0",
+    "husky": "^9.1.7",
+    "lint-staged": "^16.1.5",
     "postcss": "^8.4.47",
     "tailwindcss": "^3.4.11",
     "typescript": "^5.5.3",
-    "typescript-eslint": "^8.0.1",
+    "typescript-eslint": "^8.41.0",
     "vite": "^5.4.1"
+  },
+  "browserslist": [
+    ">0.5%",
+    "last 2 versions",
+    "not dead",
+    "not ie <= 11",
+    "not op_mini all"
+  ],
+  "lint-staged": {
+    "**/*.{js,jsx,ts,tsx}": "eslint --fix"
   }
 }
