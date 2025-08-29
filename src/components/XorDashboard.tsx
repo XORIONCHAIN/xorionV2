@@ -4,9 +4,12 @@ import { usePolkadotStore } from "@/stores/polkadotStore";
 import { useLaunchClaim } from "@/hooks/useLaunchClaim";
 import { formatTxor } from "@/lib/utils";
 
-const Card: React.FC<React.PropsWithChildren<{ title: string }>> = ({ title, children }) => (
+const Card: React.FC<React.PropsWithChildren<{ title: string; action?: React.ReactNode }>> = ({ title, children, action }) => (
     <div className="bg-gray-800 rounded-lg p-4 border border-gray-700">
-        <div className="text-sm text-gray-400 mb-1">{title}</div>
+        <div className="flex items-center justify-between mb-1">
+            <div className="text-sm text-gray-400">{title}</div>
+            {action}
+        </div>
         <div className="text-white text-lg">{children}</div>
     </div>
 );
@@ -91,7 +94,21 @@ export default function XorDashboard() {
                 <Card title="TGE Total Assigned (XOR)">{isLoading ? 'Loading...' : totalXor}</Card>
                 <Card title="Claimable at TGE (50%)">{isLoading ? 'Loading...' : claimableCapXor}</Card>
                 <Card title="Claimed (XOR)">{isLoading ? 'Loading...' : claimedXor}</Card>
-                <Card title="Available to Claim Now (XOR)">{isLoading ? 'Loading...' : availableClaimableXor}</Card>
+                <Card
+                    title="Available to Claim Now (XOR)"
+                    action={
+                        <a
+                            href="http://ido.xorion.network/"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="px-3 py-1 text-xs bg-blue-600 hover:bg-blue-700 text-white rounded-full transition-colors whitespace-nowrap min-w-fit"
+                        >
+                            Buy IDO
+                        </a>
+                    }
+                >
+                    {isLoading ? 'Loading...' : availableClaimableXor}
+                </Card>
             </div>
 
             <div className="bg-gray-800 rounded-lg p-4 border border-gray-700">
