@@ -107,7 +107,7 @@ export default function XorDashboard() {
                 <div className="flex items-center gap-2 text-sm text-gray-400">
                     <a
                         className="px-2 py-1 rounded-full border border-gray-600 text-gray-200 hover:bg-gray-700"
-                        href="https://etherscan.io/token/0xa21f5388f3b812d0c2ab97a6c04f40576b961eb3?a=0x0a2e8dc7cf86f447d7553e850810682ae3307d81"
+                        href="https://etherscan.io/token/0xa21f5388f3b812d0c2ab97a6c04f40576b961eb3"
                         target="_blank"
                         rel="noopener noreferrer"
                     >
