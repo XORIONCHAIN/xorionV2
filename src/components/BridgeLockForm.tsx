@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { web3FromSource } from "@polkadot/extension-dapp";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -39,7 +39,7 @@ const BridgeLockForm = ({
 }) => {
   const { api, isConnected, isConnecting, forceReconnect, status } =
     usePolkadot();
-  const { selectedAccount } = useWallet();
+  const { selectedAccount,balance } = useWallet();
   const { toast } = useToast();
   const [amount, setAmount] = useState<string>("");
   const [relayerFee, setRelayerFee] = useState<string>("");
@@ -204,7 +204,7 @@ const BridgeLockForm = ({
       writeContract({
         address: BRIDGE_CONTRACT_ADDRESS,
         abi: BRIDGE_ABI,
-        functionName: "lock",
+        functionName: "release",
         args: [amountUnits, recipientBytes],
         chain: ETH_CHAIN,
         account: ethAddress, // Fix: Add the connected Ethereum address
@@ -217,10 +217,15 @@ const BridgeLockForm = ({
   };
 
   const handleConnectEthereum = () => {
-    const metaMask = connectors.find((c) => c.id === "metaMask");
+     console.log('Available connectors:', connectors);
+    const metaMask = connectors.find((c) => c.id === "io.metamask");
+    const trustWallet = connectors.find((c) => c.id === "com.trustwallet.app");
     if (metaMask) {
       connect({ connector: metaMask });
-    } else {
+    } else if (trustWallet){
+      connect({connector: trustWallet})
+    }
+    else {
       setError("MetaMask not detected. Please install it.");
     }
   };
@@ -244,6 +249,35 @@ const BridgeLockForm = ({
       });
     }
   }, [ethError, isEthSuccess, txHash, toast]);
+
+
+  useEffect(() => {
+  console.log('Ethereum connection status:', {
+    isEthConnected,
+    ethAddress,
+    connectors: connectors.map(c => ({id: c.id, name: c.name})),
+    hasWindowEthereum: typeof window.ethereum !== 'undefined'
+  });
+}, [isEthConnected, ethAddress, connectors]);
+
+// console.log('selectedAccount: ', selectedAccount)
+// console.log('balance: ', balance)
+
+
+// Format the balance for display
+  const formattedBalance = useMemo(() => {
+    if (!balance) return '0';
+    return (Number(balance) / Math.pow(10, TOKEN_DECIMALS)).toFixed(4);
+  }, [balance]);
+
+  // Max button handler
+  const handleMaxAmount = () => {
+    if (balance && Number(balance) > 0) {
+      const humanBalance = (Number(balance) / Math.pow(10, TOKEN_DECIMALS)).toString();
+      setAmount(humanBalance);
+    }
+  };
+
 
   return (
     <Card className="max-w-lg mx-auto">
@@ -326,13 +360,36 @@ const BridgeLockForm = ({
           )}
           {activeTab === "bridge" && (
             <div className="space-y-4">
-              <Input
-                type="number"
-                placeholder="Amount to bridge (e.g., 1.5)"
-                value={amount}
-                onChange={(e) => setAmount(e.target.value)}
-                step="0.000000000000000001"
-              />
+               {selectedAccount && (
+      <div className="flex justify-between items-center text-sm text-gray-600 p-2 bg-gray-100
+       rounded-lg cursor-pointer">
+        <span className="font-medium">Available Balance:</span>
+        <span className="font-semibold text-blue-600">
+          {formattedBalance} tokens
+        </span>
+      </div>
+    )}
+                 <div className="relative">
+      <Input
+        type="number"
+        placeholder="Amount to bridge (e.g., 1.5)"
+        value={amount}
+        onChange={(e) => setAmount(e.target.value)}
+        step="0.000000000000000001"
+        className="pr-16" // Add padding for the button
+      />
+      {selectedAccount && (
+        <button
+          type="button"
+          className="absolute right-1 cursor-pointer top-1.5 h-3/4 px-5 text-xs bg-slate-300
+           text-black z-10 rounded-sm"
+          onClick={handleMaxAmount}
+          disabled={!balance || Number(balance) <= 0}
+        >
+          MAX
+        </button>
+      )}
+    </div>
               <Input
                 type="number"
                 placeholder="Relayer fee (e.g., 0.01)"
