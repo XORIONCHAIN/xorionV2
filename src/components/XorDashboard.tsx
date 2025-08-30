@@ -16,8 +16,34 @@ const Card: React.FC<React.PropsWithChildren<{ title: string; action?: React.Rea
 
 export default function XorDashboard() {
     const { selectedAccount, balance } = useWallet();
-    const { apiState } = usePolkadotStore();
+    const { apiState, api } = usePolkadotStore();
     const { data, isLoading, error } = useLaunchClaim();
+    const [currentBlock, setCurrentBlock] = React.useState<number>(0);
+
+    // Fetch current block number
+    React.useEffect(() => {
+        if (!api || apiState.status !== 'connected') return;
+
+        const fetchBlockNumber = async () => {
+            try {
+                const header = await api.rpc.chain.getHeader();
+                setCurrentBlock(header.number.toNumber());
+            } catch (error) {
+                console.error('Failed to fetch block number:', error);
+            }
+        };
+
+        fetchBlockNumber();
+
+        // Subscribe to new blocks
+        const unsubscribe = api.rpc.chain.subscribeNewHeads((header) => {
+            setCurrentBlock(header.number.toNumber());
+        });
+
+        return () => {
+            unsubscribe.then(unsub => unsub());
+        };
+    }, [api, apiState.status]);
 
     const formattedBalance = useMemo(() => {
         if (!balance) return "0";
@@ -55,12 +81,24 @@ export default function XorDashboard() {
         }
     }, [data?.claimed, claimableCapRaw]);
 
-    const startTimestamp = useMemo(() => {
+    const startBlockInfo = useMemo(() => {
         if (!data?.start || data.start === "0") return "—";
-        const ms = Number(data.start);
-        if (!isFinite(ms) || ms <= 0) return data.start;
-        return new Date(ms).toLocaleString();
-    }, [data?.start]);
+        const startBlock = Number(data.start);
+        if (!isFinite(startBlock) || startBlock <= 0) return data.start;
+
+        // Convert block number to approximate date
+        // Assuming 6 seconds per block (Polkadot standard)
+        const BLOCK_TIME_SECONDS = 6;
+        const blocksElapsed = currentBlock - startBlock;
+        const secondsElapsed = blocksElapsed * BLOCK_TIME_SECONDS;
+
+        if (secondsElapsed < 0) {
+            return `Block ${startBlock} (Future)`;
+        }
+
+        const date = new Date(Date.now() - (secondsElapsed * 1000));
+        return `Block ${startBlock} (${date.toLocaleDateString()})`;
+    }, [data?.start, currentBlock]);
 
     return (
         <div className="w-full space-y-6">
@@ -122,7 +160,7 @@ export default function XorDashboard() {
                 <div className="mt-3 grid grid-cols-1 sm:grid-cols-3 gap-2 text-sm">
                     <div className="text-gray-400">TGE Assigned: <span className="text-white">{totalXor} XOR</span></div>
                     <div className="text-gray-400">TGE Claimable (50%): <span className="text-white">{claimableCapXor} XOR</span></div>
-                    <div className="text-gray-400">Start: <span className="text-white">{startTimestamp}</span></div>
+                    <div className="text-gray-400">Start: <span className="text-white">{startBlockInfo}</span></div>
                 </div>
                 {error && <div className="mt-2 text-red-400 text-sm">{error}</div>}
             </div>
